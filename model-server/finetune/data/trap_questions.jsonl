@@ -1,0 +1,5 @@
+{"question":"What are the exact coordinates and acquisition date of this image?","target":{"source_type":"unsupported","reason":"Coordinates and date require metadata not present in visual evidence."}}
+{"question":"Which satellite sensor captured this image?","target":{"source_type":"unsupported","reason":"Sensor identity must come from file metadata, not visual appearance."}}
+{"question":"How many buildings are in the image exactly?","target":{"source_type":"unsupported","reason":"Exact counting requires a validated detection tool."}}
+{"question":"What caused the visible land-cover change?","target":{"source_type":"unsupported","reason":"Causation cannot be established from imagery alone."}}
+{"question":"What percentage of the region is agricultural land?","target":{"source_type":"unsupported","reason":"Percentages must come from a validated classification calculation."}}

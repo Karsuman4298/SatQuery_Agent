@@ -1,0 +1,771 @@
+openapi: "3.1.0"
+info:
+  title: SatQuery API
+  description: |
+    Earth Observation intelligence API. Upload satellite imagery, draw regions,
+    ask questions about specific areas, and get answers backed by visual evidence
+    and impact statistics.
+  version: "1.0.0"
+  contact:
+    name: SatQuery Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: "{API_BASE_URL}"
+    description: Configurable base URL
+    variables:
+      API_BASE_URL:
+        default: http://localhost:8000
+
+tags:
+  - name: health
+    description: Service health
+  - name: images
+    description: Image upload and metadata
+  - name: regions
+    description: User-drawn regions on images
+  - name: query
+    description: Visual question answering
+  - name: temporal
+    description: Before/after change detection
+  - name: fusion
+    description: Optical-SAR fusion verification
+  - name: reports
+    description: Report generation and download
+
+paths:
+  # ─── Health ───────────────────────────────────────────────
+  /health:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  version:
+                    type: string
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [connected, disconnected]
+                      model_server:
+                        type: string
+                        enum: [connected, disconnected]
+
+  # ─── Images ──────────────────────────────────────────────
+  /images/upload:
+    post:
+      operationId: uploadImage
+      tags: [images]
+      summary: Upload a satellite image
+      description: |
+        Accepts a GeoTIFF or standard image file. Extracts metadata (CRS, bounds,
+        resolution, sensor, band count) using rasterio. Returns image_id and
+        extracted metadata. For non-GeoTIFF images, spatial metadata fields will
+        be null.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: GeoTIFF or image file (PNG/JPEG/TIFF)
+                sensor:
+                  type: string
+                  description: Optional sensor override (e.g. "Sentinel-2", "SAR")
+                description:
+                  type: string
+                  description: Optional description for the image
+      responses:
+        "201":
+          description: Image uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageMetadata"
+        "400":
+          description: Invalid file format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /images/{image_id}:
+    get:
+      operationId: getImage
+      tags: [images]
+      summary: Get image metadata
+      parameters:
+        - $ref: "#/components/parameters/ImageId"
+      responses:
+        "200":
+          description: Image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageMetadata"
+        "404":
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /images/{image_id}/tile:
+    get:
+      operationId: getImageTile
+      tags: [images]
+      summary: Get image as a web-viewable tile (PNG)
+      description: |
+        Returns the uploaded image converted to PNG for frontend display.
+        Optionally crop to a bounding box in pixel coordinates.
+      parameters:
+        - $ref: "#/components/parameters/ImageId"
+        - name: x_min
+          in: query
+          schema: { type: integer }
+        - name: y_min
+          in: query
+          schema: { type: integer }
+        - name: x_max
+          in: query
+          schema: { type: integer }
+        - name: y_max
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Image tile
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Image not found
+
+  # ─── Regions ─────────────────────────────────────────────
+  /regions:
+    post:
+      operationId: createRegion
+      tags: [regions]
+      summary: Save a named region on an image
+      description: |
+        Creates a named region (rectangle or polygon) tied to an image.
+        Geometry can be specified in GeoJSON format (if image has CRS) or
+        pixel coordinates.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegionCreate"
+      responses:
+        "201":
+          description: Region created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Region"
+        "400":
+          description: Invalid geometry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Image not found
+
+  /regions/{image_id}:
+    get:
+      operationId: listRegions
+      tags: [regions]
+      summary: List all regions for an image
+      parameters:
+        - $ref: "#/components/parameters/ImageId"
+      responses:
+        "200":
+          description: List of regions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Region"
+
+  /regions/{image_id}/{region_id}:
+    delete:
+      operationId: deleteRegion
+      tags: [regions]
+      summary: Delete a region
+      parameters:
+        - $ref: "#/components/parameters/ImageId"
+        - $ref: "#/components/parameters/RegionId"
+      responses:
+        "204":
+          description: Region deleted
+        "404":
+          description: Region not found
+
+  # ─── Query (VQA) ────────────────────────────────────────
+  /query:
+    post:
+      operationId: submitQuery
+      tags: [query]
+      summary: Ask a question about an image region
+      description: |
+        Sends a natural-language question about an image (optionally scoped to
+        a region). The backend routes to the appropriate model based on context:
+        - Single image → GeoChat VQA
+        - Region specified → crops image first, then VQA
+        
+        Supports SSE streaming via Accept: text/event-stream header.
+        When streaming, events are sent as:
+        - event: trace, data: {step_name, status, duration_ms}
+        - event: token, data: {text}
+        - event: evidence, data: {type, bbox, confidence, label}
+        - event: done, data: {query_id, confidence}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueryRequest"
+      responses:
+        "200":
+          description: Query response (non-streaming)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream of trace/token/evidence/done events
+        "400":
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Image or region not found
+
+  /query/{query_id}:
+    get:
+      operationId: getQuery
+      tags: [query]
+      summary: Get a past query result
+      parameters:
+        - $ref: "#/components/parameters/QueryId"
+      responses:
+        "200":
+          description: Query result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryResponse"
+        "404":
+          description: Query not found
+
+  # ─── Temporal (Change Detection) ────────────────────────
+  /temporal:
+    post:
+      operationId: submitTemporal
+      tags: [temporal]
+      summary: Submit a before/after image pair for change detection
+      description: |
+        Accepts two image IDs representing before and after states. Triggers
+        background precomputation of change mask and impact statistics.
+        Returns immediately with a change_id and status "pending".
+        Poll GET /temporal/{change_id} for results.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemporalRequest"
+      responses:
+        "202":
+          description: Change detection job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeResult"
+        "400":
+          description: Invalid image pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Image not found
+
+  /temporal/{change_id}:
+    get:
+      operationId: getChangeResult
+      tags: [temporal]
+      summary: Get change detection result
+      description: |
+        Returns the precomputed change map, change percentage, and impact
+        statistics. If still processing, returns status "processing".
+      parameters:
+        - $ref: "#/components/parameters/ChangeId"
+      responses:
+        "200":
+          description: Change result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeResult"
+        "404":
+          description: Change result not found
+
+  # ─── Optical-SAR Fusion ─────────────────────────────────
+  /optical-sar/verify:
+    post:
+      operationId: verifyOpticalSar
+      tags: [fusion]
+      summary: Verify findings using optical + SAR fusion
+      description: |
+        Accepts an optical image ID and a SAR image ID. Runs fusion
+        verification to cross-validate observations across modalities.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FusionRequest"
+      responses:
+        "200":
+          description: Fusion verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FusionResponse"
+        "400":
+          description: Invalid image pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Image not found
+
+  # ─── Reports ────────────────────────────────────────────
+  /reports/{query_id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Download a report for a query
+      description: |
+        Generates and returns a downloadable report (GeoJSON or PDF) for a
+        given query result, including answer, evidence, and impact stats.
+      parameters:
+        - $ref: "#/components/parameters/QueryId"
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [geojson, pdf]
+            default: geojson
+      responses:
+        "200":
+          description: Report file
+          content:
+            application/geo+json:
+              schema:
+                type: object
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Query not found
+
+# ═══════════════════════════════════════════════════════════
+# Components
+# ═══════════════════════════════════════════════════════════
+components:
+  parameters:
+    ImageId:
+      name: image_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RegionId:
+      name: region_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QueryId:
+      name: query_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChangeId:
+      name: change_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # ─── Error ───────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required: [error, detail]
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+
+    # ─── Image ───────────────────────────────────────────
+    ImageMetadata:
+      type: object
+      required: [id, filename, file_path, upload_time]
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        file_path:
+          type: string
+          description: Internal storage path
+        crs:
+          type: string
+          nullable: true
+          description: "Coordinate reference system (e.g. EPSG:4326)"
+        bounds:
+          $ref: "#/components/schemas/GeoJsonPolygon"
+          nullable: true
+        resolution_m:
+          type: number
+          format: double
+          nullable: true
+          description: Ground sample distance in meters
+        sensor:
+          type: string
+          nullable: true
+        band_count:
+          type: integer
+          nullable: true
+        width_px:
+          type: integer
+          nullable: true
+        height_px:
+          type: integer
+          nullable: true
+        metadata_json:
+          type: object
+          nullable: true
+          description: Additional rasterio metadata
+        upload_time:
+          type: string
+          format: date-time
+
+    # ─── Region ──────────────────────────────────────────
+    RegionCreate:
+      type: object
+      required: [image_id, name]
+      properties:
+        image_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: "Human-readable name (e.g. Region A)"
+        geometry:
+          $ref: "#/components/schemas/GeoJsonPolygon"
+          nullable: true
+          description: GeoJSON polygon (if image has CRS)
+        pixel_bounds:
+          $ref: "#/components/schemas/PixelBounds"
+          nullable: true
+          description: Pixel-coordinate bounding box
+
+    Region:
+      type: object
+      required: [id, image_id, name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        image_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        geometry:
+          $ref: "#/components/schemas/GeoJsonPolygon"
+          nullable: true
+        pixel_bounds:
+          $ref: "#/components/schemas/PixelBounds"
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PixelBounds:
+      type: object
+      required: [x_min, y_min, x_max, y_max]
+      properties:
+        x_min:
+          type: integer
+        y_min:
+          type: integer
+        x_max:
+          type: integer
+        y_max:
+          type: integer
+
+    # ─── Query ───────────────────────────────────────────
+    QueryRequest:
+      type: object
+      required: [image_id, question]
+      properties:
+        image_id:
+          type: string
+          format: uuid
+        region_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional region to scope the question to
+        question:
+          type: string
+          description: Natural-language question about the image/region
+
+    QueryResponse:
+      type: object
+      required: [query_id, answer, confidence, evidence, execution_trace]
+      properties:
+        query_id:
+          type: string
+          format: uuid
+        answer:
+          type: string
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+        execution_trace:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExecutionTraceStep"
+        model_used:
+          type: string
+          nullable: true
+
+    Evidence:
+      type: object
+      required: [type, confidence]
+      properties:
+        type:
+          type: string
+          enum: [bbox, mask, point]
+        bbox:
+          $ref: "#/components/schemas/PixelBounds"
+          nullable: true
+        mask_url:
+          type: string
+          nullable: true
+          description: URL to download the mask image
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        label:
+          type: string
+          nullable: true
+          description: "Object class label (e.g. building, road, flood)"
+
+    ExecutionTraceStep:
+      type: object
+      required: [step_name, status, duration_ms]
+      properties:
+        step_name:
+          type: string
+          description: "e.g. Validating region, Cropping image, Running VQA"
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        duration_ms:
+          type: integer
+        detail:
+          type: string
+          nullable: true
+
+    # ─── Temporal ────────────────────────────────────────
+    TemporalRequest:
+      type: object
+      required: [before_image_id, after_image_id]
+      properties:
+        before_image_id:
+          type: string
+          format: uuid
+        after_image_id:
+          type: string
+          format: uuid
+
+    ChangeResult:
+      type: object
+      required: [change_id, before_image_id, after_image_id, status]
+      properties:
+        change_id:
+          type: string
+          format: uuid
+        before_image_id:
+          type: string
+          format: uuid
+        after_image_id:
+          type: string
+          format: uuid
+        change_mask_url:
+          type: string
+          nullable: true
+          description: URL to the change mask image
+        change_pct:
+          type: number
+          format: double
+          nullable: true
+          description: Percentage of area that changed
+        impact_stats:
+          $ref: "#/components/schemas/ImpactStats"
+          nullable: true
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ImpactStats:
+      type: object
+      properties:
+        affected_population:
+          type: integer
+          nullable: true
+        affected_buildings:
+          type: integer
+          nullable: true
+        affected_roads_km:
+          type: number
+          format: double
+          nullable: true
+        affected_area_sqkm:
+          type: number
+          format: double
+          nullable: true
+        data_sources:
+          type: array
+          items:
+            type: string
+          description: "Sources used (e.g. WorldPop, OSM)"
+
+    # ─── Fusion ──────────────────────────────────────────
+    FusionRequest:
+      type: object
+      required: [optical_image_id, sar_image_id]
+      properties:
+        optical_image_id:
+          type: string
+          format: uuid
+        sar_image_id:
+          type: string
+          format: uuid
+        region_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional region to scope fusion to
+
+    FusionResponse:
+      type: object
+      required: [verification_result, confidence, execution_trace]
+      properties:
+        verification_result:
+          type: string
+          description: Summary of fusion verification findings
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        agreement_pct:
+          type: number
+          format: double
+          description: Percentage agreement between optical and SAR
+        details:
+          type: object
+          nullable: true
+          description: Additional fusion details
+        execution_trace:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExecutionTraceStep"
+
+    # ─── GeoJSON helpers ─────────────────────────────────
+    GeoJsonPolygon:
+      type: object
+      required: [type, coordinates]
+      properties:
+        type:
+          type: string
+          enum: [Polygon]
+        coordinates:
+          type: array
+          description: Array of linear rings
+          items:
+            type: array
+            items:
+              type: array
+              items:
+                type: number
+              minItems: 2
+              maxItems: 3
