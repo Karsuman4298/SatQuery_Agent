@@ -1,0 +1,706 @@
+/* Auth.css — Pixel-perfect SatQuery AI Sign In & Sign Up styles */
+
+.satquery-auth-page {
+  width: 100vw;
+  min-height: 100vh;
+  background-color: #020408;
+  display: flex;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #f0f4f8;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Two-column master grid */
+.satquery-auth-container {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Left Hero Visual Section */
+.satquery-auth-left {
+  flex: 1.15;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 44px 56px;
+  overflow: hidden;
+  background-color: #02060d;
+}
+
+.satquery-auth-left-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 1;
+  pointer-events: none;
+  filter: brightness(1.05) contrast(1.08);
+}
+
+/* Gradient vignette overlays for left section */
+.satquery-auth-left-overlay {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 75% 50%, rgba(2, 6, 13, 0.2) 0%, rgba(2, 6, 13, 0.75) 100%),
+    linear-gradient(to right, rgba(2, 4, 8, 0.65) 0%, rgba(2, 4, 8, 0.2) 50%, rgba(2, 4, 8, 0.9) 100%),
+    linear-gradient(to top, rgba(2, 4, 8, 0.85) 0%, transparent 30%),
+    linear-gradient(to bottom, rgba(2, 4, 8, 0.75) 0%, transparent 20%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.satquery-auth-left-content {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  min-height: calc(100vh - 88px);
+}
+
+/* Header with Logo */
+.satquery-auth-header {
+  display: flex;
+  align-items: center;
+}
+
+/* Hero Headline block */
+.satquery-auth-headline-block {
+  margin-top: auto;
+  margin-bottom: auto;
+  padding: 40px 0;
+  max-width: 480px;
+}
+
+.satquery-auth-headline {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.4rem, 4vw, 3.2rem);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+
+.satquery-auth-headline-green {
+  color: #00ff88;
+  text-shadow: 0 0 20px rgba(0, 255, 136, 0.35);
+}
+
+.satquery-auth-headline-line {
+  width: 42px;
+  height: 3px;
+  background: #00ff88;
+  border-radius: 2px;
+  margin-bottom: 24px;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+}
+
+.satquery-auth-description {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: #94a3b8;
+  max-width: 360px;
+}
+
+/* Stats Row for Sign In */
+.satquery-auth-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.satquery-auth-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.satquery-auth-stat-val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #00ff88;
+  line-height: 1.2;
+}
+
+.satquery-auth-stat-lbl {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: #64748b;
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+
+.satquery-auth-stat-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Modality Cards for Sign Up */
+.satquery-auth-modalities {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 32px;
+  max-width: 440px;
+}
+
+.satquery-modality-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.satquery-modality-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 255, 136, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+.satquery-modality-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.satquery-modality-card:hover .satquery-modality-thumb {
+  border-color: #00ff88;
+  box-shadow: 0 0 16px rgba(0, 255, 136, 0.4);
+}
+
+.satquery-modality-card:hover .satquery-modality-thumb img {
+  transform: scale(1.08);
+}
+
+.satquery-modality-lbl {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+/* Left Hero Bottom Banner */
+.satquery-auth-left-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-top: 24px;
+}
+
+.satquery-auth-left-footer-dash {
+  width: 18px;
+  height: 2px;
+  background: #00ff88;
+  display: inline-block;
+}
+
+/* Target Reticle for Sign Up Left View */
+.satquery-target-reticle {
+  position: absolute;
+  top: 22%;
+  right: 18%;
+  width: 90px;
+  height: 90px;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0.65;
+}
+
+.satquery-target-reticle::before,
+.satquery-target-reticle::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: #00ff88;
+  border-style: solid;
+}
+
+.satquery-target-reticle::before {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+}
+
+.satquery-target-reticle::after {
+  bottom: 0;
+  right: 0;
+  border-width: 0 2px 2px 0;
+}
+
+/* Right Form Section */
+.satquery-auth-right {
+  flex: 0.95;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 36px 48px 28px 48px;
+  position: relative;
+  background: radial-gradient(circle at 50% 30%, #06111f 0%, #020408 100%);
+  z-index: 10;
+}
+
+/* Back to Home Link */
+.satquery-auth-top-nav {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.satquery-back-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #8da2c0;
+  font-size: 12.5px;
+  font-weight: 400;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.satquery-back-home-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.satquery-back-home-link:hover svg {
+  transform: translateX(-3px);
+}
+
+.satquery-back-home-link svg {
+  transition: transform 0.2s ease;
+}
+
+/* Authentication Card */
+.satquery-auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(7, 15, 27, 0.78);
+  border: 1px solid rgba(0, 255, 136, 0.16);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border-radius: 20px;
+  padding: 36px 36px 32px 36px;
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    0 0 35px rgba(0, 255, 136, 0.04),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.satquery-auth-card:hover {
+  border-color: rgba(0, 255, 136, 0.25);
+  box-shadow: 
+    0 24px 60px rgba(0, 0, 0, 0.7),
+    0 0 45px rgba(0, 255, 136, 0.08),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+/* Card Header */
+.satquery-card-tag {
+  text-align: center;
+  font-family: "'Space Grotesk', sans-serif";
+  font-size: 12px;
+  font-weight: 600;
+  color: #00ff88;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.satquery-card-title {
+  text-align: center;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 23px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.satquery-card-subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: #8da2c0;
+  line-height: 1.45;
+  font-weight: 300;
+  margin-bottom: 24px;
+}
+
+/* Form Styles */
+.satquery-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.satquery-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.satquery-input-icon {
+  position: absolute;
+  left: 14px;
+  color: #64748b;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.satquery-input {
+  width: 100%;
+  height: 46px;
+  background: rgba(13, 22, 38, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0 42px 0 42px;
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.satquery-input:-webkit-autofill,
+.satquery-input:-webkit-autofill:hover,
+.satquery-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0 1000px #0d1626 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  border-color: rgba(0, 255, 136, 0.4);
+}
+
+.satquery-input::placeholder {
+  color: #55657d;
+  font-weight: 400;
+}
+
+.satquery-input:focus {
+  background: rgba(16, 28, 48, 0.95);
+  border-color: #00ff88;
+  box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.15);
+}
+
+.satquery-input:focus ~ .satquery-input-icon,
+.satquery-input-group:focus-within .satquery-input-icon {
+  color: #00ff88;
+}
+
+.satquery-input-error-border {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+}
+
+.satquery-input-toggle {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s ease;
+}
+
+.satquery-input-toggle:hover {
+  color: #00ff88;
+}
+
+/* Field Inline Error */
+.satquery-field-error {
+  font-size: 11.5px;
+  color: #f87171;
+  margin-top: -8px;
+  margin-bottom: 2px;
+  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Options row: remember me & forgot password */
+.satquery-form-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: #8da2c0;
+}
+
+.satquery-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.satquery-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(13, 22, 38, 0.7);
+  cursor: pointer;
+  position: relative;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.satquery-checkbox:checked {
+  background: #00ff88;
+  border-color: #00ff88;
+}
+
+.satquery-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #02140a;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.satquery-checkbox:focus-visible {
+  outline: 2px solid #00ff88;
+  outline-offset: 2px;
+}
+
+.satquery-link {
+  color: #00ff88;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.satquery-link:hover {
+  color: #4df8a9;
+  text-decoration: underline;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+/* Primary Submit Button */
+.satquery-submit-btn {
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(135deg, #00ff88 0%, #00d970 100%);
+  border: none;
+  border-radius: 8px;
+  color: #021a0d;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 18px rgba(0, 255, 136, 0.35);
+  margin-top: 4px;
+}
+
+.satquery-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  background: linear-gradient(135deg, #24ffa0 0%, #00e676 100%);
+  box-shadow: 0 6px 24px rgba(0, 255, 136, 0.55);
+}
+
+.satquery-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(0, 255, 136, 0.3);
+}
+
+.satquery-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Divider with text */
+.satquery-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0;
+  gap: 12px;
+}
+
+.satquery-divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.satquery-divider-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+/* Social Buttons Stack */
+.satquery-social-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.satquery-social-btn:hover {
+  background: rgba(22, 34, 54, 0.85) !important;
+  border-color: rgba(0, 255, 136, 0.3) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* Bottom Card Switch Text */
+.satquery-card-switch {
+  text-align: center;
+  font-size: 13px;
+  color: #8da2c0;
+  margin-top: 22px;
+}
+
+/* Page Footer metadata */
+.satquery-auth-page-footer {
+  font-family: 'Space Grotesk', 'Inter', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: #4b5d78;
+  text-transform: uppercase;
+  margin-top: 24px;
+  text-align: center;
+}
+
+/* Form Alert/Success Notification */
+.satquery-form-alert {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.satquery-form-alert.success {
+  background: rgba(0, 255, 136, 0.12);
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  color: #00ff88;
+}
+
+.satquery-form-alert.error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .satquery-auth-container {
+    flex-direction: column;
+    min-height: auto;
+  }
+  
+  .satquery-auth-left {
+    padding: 36px 28px;
+    min-height: 380px;
+  }
+  
+  .satquery-auth-headline {
+    font-size: 2rem;
+  }
+  
+  .satquery-auth-right {
+    padding: 36px 20px 32px 20px;
+  }
+  
+  .satquery-auth-card {
+    padding: 28px 22px;
+  }
+  
+  .satquery-auth-modalities {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 640px) {
+  .satquery-auth-left {
+    padding: 28px 18px;
+  }
+  
+  .satquery-auth-stats {
+    gap: 14px;
+  }
+  
+  .satquery-auth-stat-val {
+    font-size: 16px;
+  }
+  
+  .satquery-auth-modalities {
+    gap: 8px;
+  }
+  
+  .satquery-modality-lbl {
+    font-size: 9.5px;
+  }
+  
+  .satquery-auth-card {
+    padding: 24px 16px;
+  }
+}

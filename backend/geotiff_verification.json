@@ -1,0 +1,52 @@
+{
+  "dummy_geotiff": {
+    "filename": "dummy_geotiff.tif",
+    "file_path": "dummy_geotiff.tif",
+    "crs": "EPSG:32632",
+    "bounds": "POLYGON ((501000 4599000, 501000 4600000, 500000 4600000, 500000 4599000, 501000 4599000))",
+    "resolution_m": 10.0,
+    "band_count": 3,
+    "width_px": 100,
+    "height_px": 100,
+    "metadata_json": {
+      "driver": "GTiff",
+      "dtypes": [
+        "uint8",
+        "uint8",
+        "uint8"
+      ],
+      "nodata": [
+        null,
+        null,
+        null
+      ],
+      "geojson_bounds": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              501000.0,
+              4599000.0
+            ],
+            [
+              501000.0,
+              4600000.0
+            ],
+            [
+              500000.0,
+              4600000.0
+            ],
+            [
+              500000.0,
+              4599000.0
+            ],
+            [
+              501000.0,
+              4599000.0
+            ]
+          ]
+        ]
+      }
+    }
+  }
+}

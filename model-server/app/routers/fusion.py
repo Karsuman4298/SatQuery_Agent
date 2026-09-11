@@ -1,11 +1,10 @@
+from __future__ import annotations
 """Optical-SAR fusion endpoint backed by the configured OpenRouter model."""
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-
 from app.agent.state import FusionResponse as FusionAnalysisResponse
 from app.openrouter import call_model_with_schema, image_data_uri
-
 router = APIRouter()
 
 

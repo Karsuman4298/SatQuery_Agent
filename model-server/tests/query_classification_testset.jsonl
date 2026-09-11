@@ -1,0 +1,151 @@
+{"query": "what is the color of the buildings in the center", "label": "vqa"}
+{"query": "how dense is the urban area", "label": "vqa"}
+{"query": "are there solar panels on any rooftops", "label": "vqa"}
+{"query": "describe the river system visible here", "label": "vqa"}
+{"query": "what crop patterns can you identify", "label": "vqa"}
+{"query": "is there flooding visible in this scene", "label": "vqa"}
+{"query": "count the number of ships in the harbor", "label": "vqa"}
+{"query": "what season does this image appear to be from", "label": "vqa"}
+{"query": "are there any bridges in this image", "label": "vqa"}
+{"query": "what is the surface material of the parking lot", "label": "vqa"}
+{"query": "how many lanes does the highway have", "label": "vqa"}
+{"query": "is there a dam visible", "label": "vqa"}
+{"query": "what type of forest is this", "label": "vqa"}
+{"query": "describe the coastal features", "label": "vqa"}
+{"query": "are there any greenhouses visible", "label": "vqa"}
+{"query": "what is the approximate elevation change", "label": "vqa"}
+{"query": "identify any military installations", "label": "vqa"}
+{"query": "is this an industrial or commercial zone", "label": "vqa"}
+{"query": "what geological features are visible", "label": "vqa"}
+{"query": "are there any wind turbines in the image", "label": "vqa"}
+{"query": "what kind of settlement pattern is this", "label": "vqa"}
+{"query": "is the river navigable based on its width", "label": "vqa"}
+{"query": "what is the albedo of the rooftops", "label": "vqa"}
+{"query": "how many stories do the buildings appear to have", "label": "vqa"}
+{"query": "is there an active wildfire visible", "label": "vqa"}
+{"query": "what types of vehicles are in the lot", "label": "vqa"}
+{"query": "are the fields irrigated or rain-fed", "label": "vqa"}
+{"query": "describe the drainage pattern", "label": "vqa"}
+{"query": "what is the land use around the lake", "label": "vqa"}
+{"query": "is there evidence of mining activity", "label": "vqa"}
+{"query": "outline the main road in the scene", "label": "segmentation"}
+{"query": "extract all water features", "label": "segmentation"}
+{"query": "mark the boundaries of the industrial complex", "label": "segmentation"}
+{"query": "isolate the golf course", "label": "segmentation"}
+{"query": "delineate the wetland area", "label": "segmentation"}
+{"query": "segment the solar farm panels", "label": "segmentation"}
+{"query": "mask out everything except buildings", "label": "segmentation"}
+{"query": "highlight the crop fields separately from pasture", "label": "segmentation"}
+{"query": "extract the coastline boundary", "label": "segmentation"}
+{"query": "isolate the runway from the surrounding tarmac", "label": "segmentation"}
+{"query": "mark the forest boundary", "label": "segmentation"}
+{"query": "segment the river channel", "label": "segmentation"}
+{"query": "outline the stadium and its parking area", "label": "segmentation"}
+{"query": "extract the railway line from this image", "label": "segmentation"}
+{"query": "delineate the dam structure", "label": "segmentation"}
+{"query": "mask the quarry or open pit mine", "label": "segmentation"}
+{"query": "isolate the greenhouse structures", "label": "segmentation"}
+{"query": "segment the harbor and dock area", "label": "segmentation"}
+{"query": "outline each individual building footprint", "label": "segmentation"}
+{"query": "extract the bridge from the surrounding water", "label": "segmentation"}
+{"query": "highlight the sand dunes separately", "label": "segmentation"}
+{"query": "mask the mangrove forest region", "label": "segmentation"}
+{"query": "delineate the park and green spaces", "label": "segmentation"}
+{"query": "segment the highway interchange", "label": "segmentation"}
+{"query": "isolate the power plant cooling towers", "label": "segmentation"}
+{"query": "extract all impervious surfaces", "label": "segmentation"}
+{"query": "outline the landfill area", "label": "segmentation"}
+{"query": "segment the ski runs on the mountain", "label": "segmentation"}
+{"query": "mask the reservoir from surrounding land", "label": "segmentation"}
+{"query": "delineate the cemetery boundaries", "label": "segmentation"}
+{"query": "highlight the shipping containers in the port", "label": "segmentation"}
+{"query": "how has the shoreline shifted over this period", "label": "change_detection"}
+{"query": "identify any new housing developments", "label": "change_detection"}
+{"query": "has the forest area decreased between the two dates", "label": "change_detection"}
+{"query": "spot the differences between these temporal acquisitions", "label": "change_detection"}
+{"query": "what infrastructure was added since the earlier capture", "label": "change_detection"}
+{"query": "track the urban sprawl between these two images", "label": "change_detection"}
+{"query": "has the lake water level risen or fallen", "label": "change_detection"}
+{"query": "show me where demolition occurred", "label": "change_detection"}
+{"query": "quantify the vegetation loss", "label": "change_detection"}
+{"query": "are there any new solar installations since last year", "label": "change_detection"}
+{"query": "compare the snow cover between winter and summer", "label": "change_detection"}
+{"query": "what agricultural fields were converted to urban", "label": "change_detection"}
+{"query": "find areas of erosion between these captures", "label": "change_detection"}
+{"query": "identify reconstruction after the earthquake", "label": "change_detection"}
+{"query": "has the river course shifted", "label": "change_detection"}
+{"query": "detect any illegal construction since the last survey", "label": "change_detection"}
+{"query": "compare the extent of the oil spill over time", "label": "change_detection"}
+{"query": "what roads have been paved since the earlier image", "label": "change_detection"}
+{"query": "track glacier retreat between these two acquisitions", "label": "change_detection"}
+{"query": "show changes in the mining footprint", "label": "change_detection"}
+{"query": "has the landfill expanded", "label": "change_detection"}
+{"query": "where are the newly planted trees since the reforestation project", "label": "change_detection"}
+{"query": "compare parking lot occupancy between the two dates", "label": "change_detection"}
+{"query": "detect crop rotation patterns between seasons", "label": "change_detection"}
+{"query": "what happened to the wetland between these images", "label": "change_detection"}
+{"query": "identify flood recession areas", "label": "change_detection"}
+{"query": "track the progress of the highway construction project", "label": "change_detection"}
+{"query": "has the port expanded its container terminal", "label": "change_detection"}
+{"query": "compare cloud-free land cover between two periods", "label": "change_detection"}
+{"query": "quantify impervious surface growth", "label": "change_detection"}
+{"query": "integrate radar and multispectral to classify wetlands", "label": "fusion"}
+{"query": "what structures show up in the radar but are hidden optically", "label": "fusion"}
+{"query": "cross-reference the SAR moisture signal with visible greenness", "label": "fusion"}
+{"query": "use both sensors to distinguish bare soil from pavement", "label": "fusion"}
+{"query": "validate the optical land cover map with radar backscatter", "label": "fusion"}
+{"query": "combine C-band SAR with optical for flood mapping", "label": "fusion"}
+{"query": "correlate radar coherence with visible damage assessment", "label": "fusion"}
+{"query": "merge the two sensor views for ship detection", "label": "fusion"}
+{"query": "which water bodies are confirmed by both radar and optical", "label": "fusion"}
+{"query": "use SAR to fill gaps in cloud-covered optical imagery", "label": "fusion"}
+{"query": "compare the thermal signature with SAR scattering", "label": "fusion"}
+{"query": "is the SAR-detected flooding consistent with the optical view", "label": "fusion"}
+{"query": "fuse these for a more complete building footprint map", "label": "fusion"}
+{"query": "use both modalities to improve crop type classification", "label": "fusion"}
+{"query": "cross-validate forest biomass estimates from radar and optical", "label": "fusion"}
+{"query": "merge synthetic aperture radar with visible light imagery", "label": "fusion"}
+{"query": "check if the optical classification agrees with SAR texture", "label": "fusion"}
+{"query": "combine polarimetric SAR with multispectral analysis", "label": "fusion"}
+{"query": "use both sensor types to map urban extent more accurately", "label": "fusion"}
+{"query": "verify road detection using both radar and optical inputs", "label": "fusion"}
+{"query": "integrate ascending and descending SAR with optical for 3D mapping", "label": "fusion"}
+{"query": "use SAR to confirm optically-detected deforestation", "label": "fusion"}
+{"query": "how do the radar and optical views complement each other here", "label": "fusion"}
+{"query": "combine microwave and optical observations for soil moisture", "label": "fusion"}
+{"query": "check agreement between InSAR displacement and visible damage", "label": "fusion"}
+{"query": "fuse the lidar-derived height model with optical classification", "label": "fusion"}
+{"query": "correlate SAR intensity with optical NDVI", "label": "fusion"}
+{"query": "use dual-sensor approach to improve cloud-free composite", "label": "fusion"}
+{"query": "merge the radar shadow analysis with optical sun-angle effects", "label": "fusion"}
+{"query": "validate optical water detection using SAR wet-dry classification", "label": "fusion"}
+{"query": "hi there", "label": "conversational"}
+{"query": "what analyses can you perform", "label": "conversational"}
+{"query": "explain the difference between SAR and optical satellites", "label": "conversational"}
+{"query": "what spatial resolution do you support", "label": "conversational"}
+{"query": "thank you for the analysis", "label": "conversational"}
+{"query": "can you process Landsat 8 data", "label": "conversational"}
+{"query": "what is spectral unmixing", "label": "conversational"}
+{"query": "how does SAR penetrate clouds", "label": "conversational"}
+{"query": "summarize our previous conversation", "label": "conversational"}
+{"query": "goodbye", "label": "conversational"}
+{"query": "what remote sensing indices do you know about", "label": "conversational"}
+{"query": "explain backscatter coefficient", "label": "conversational"}
+{"query": "what is the revisit time of sentinel-1", "label": "conversational"}
+{"query": "how accurate is your change detection", "label": "conversational"}
+{"query": "tell me about your capabilities", "label": "conversational"}
+{"query": "what data formats do you accept", "label": "conversational"}
+{"query": "explain radiometric correction", "label": "conversational"}
+{"query": "what is atmospheric correction", "label": "conversational"}
+{"query": "how do you handle cloudy images", "label": "conversational"}
+{"query": "what is pansharpening", "label": "conversational"}
+{"query": "can you explain supervised classification", "label": "conversational"}
+{"query": "what sensors does the ISS carry", "label": "conversational"}
+{"query": "define spatial resolution vs spectral resolution", "label": "conversational"}
+{"query": "what is the swath width of Sentinel-2", "label": "conversational"}
+{"query": "how does interferometry work", "label": "conversational"}
+{"query": "nice work", "label": "conversational"}
+{"query": "what machine learning models do you use", "label": "conversational"}
+{"query": "can you explain orthorectification", "label": "conversational"}
+{"query": "what is geometric correction", "label": "conversational"}
+{"query": "how do polar orbiting satellites differ from geostationary", "label": "conversational"}

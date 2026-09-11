@@ -1,0 +1,45 @@
+# ============================================================
+# SatQuery AI — Docker Compose
+#
+# Usage:
+#   docker compose up --build        (build + start)
+#   docker compose up -d             (start in background)
+#   docker compose down              (stop + remove container)
+#   docker compose logs -f satquery  (stream logs)
+# ============================================================
+
+services:
+  satquery:
+    # Image name used when building locally
+    image: satquery-ai:latest
+
+    # Build from the Dockerfile in this directory
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Human-readable container name
+    container_name: satquery-ai
+
+    # Map host port 3000 → container port 80 (Nginx)
+    # Open http://localhost:3000 in your browser
+    ports:
+      - "3000:80"
+
+    # Always restart the container unless manually stopped
+    restart: unless-stopped
+
+    # Optional: environment variables
+    # SatQuery AI is a fully client-side SPA with no backend,
+    # so no secrets or API keys are required.
+    # If you add a backend later, add variables here:
+    # environment:
+    #   - VITE_API_URL=https://your-api.example.com
+
+    # Health check — confirm Nginx is responding
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

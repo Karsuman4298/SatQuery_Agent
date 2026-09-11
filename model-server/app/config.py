@@ -19,10 +19,22 @@ class Settings(BaseSettings):
     open_router_api_key: str = ""
     open_router_base_url: str = "https://openrouter.ai/api/v1"
     vision_language_model: str = "qwen/qwen-2.5-vl-7b-instruct:free"
+    
+    # Local fallback/primary model configuration
+    model_backend: str = "ollama"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5vl:7b"
+
+    # Cloudflare Workers AI configuration
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
+    cf_account_id: str = ""
+    cf_api_token: str = ""
 
     class Config:
         env_file = ".env"
         protected_namespaces = ()
+        extra = "allow"
 
 
 settings = Settings()

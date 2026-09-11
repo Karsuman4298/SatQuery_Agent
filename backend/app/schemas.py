@@ -66,10 +66,19 @@ class RegionResponse(BaseModel):
 
 
 # ─── Query ───────────────────────────────────────────────
+from typing import Literal
+
 class QueryRequest(BaseModel):
-    image_id: UUID
+    mode: Literal["vqa", "segmentation", "change_detection", "fusion", "conversational"]
+    question: str = ""
+    image_id: UUID | None = None
     region_id: UUID | None = None
-    question: str
+    
+    # Optional fields for multi-image modes
+    before_image_id: UUID | None = None
+    after_image_id: UUID | None = None
+    optical_image_id: UUID | None = None
+    sar_image_id: UUID | None = None
 
 
 class ExecutionTraceStep(BaseModel):

@@ -12,3 +12,6 @@ langgraph>=0.6.0
 langchain-huggingface>=0.3.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+torch>=2.2.0
+torchvision>=0.17.0
+ultralytics>=8.1.0

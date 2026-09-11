@@ -1,5 +1,5 @@
 """
-Query router. Handles visual question answering.
+Unified agent query router handling all 5 modalities.
 """
 
 import uuid
@@ -21,14 +21,13 @@ from PIL import Image
 from app.config import settings
 from app.database import get_db
 from app.models import ImageModel, RegionModel, QueryModel
-from app.schemas import QueryRequest, QueryResponse, ExecutionTraceStep
+from app.schemas import QueryRequest, QueryResponse
 from app.main import http_client
 
 router = APIRouter()
 
 
 def _image_data_uri(image: ImageModel, region: RegionModel | None = None) -> str:
-    """Convert an uploaded raster or selected region to an enhanced PNG data URI."""
     path = Path(image.file_path)
     if not path.is_file():
         raise FileNotFoundError(f"Uploaded image is not available: {path}")
@@ -61,7 +60,6 @@ def _image_data_uri(image: ImageModel, region: RegionModel | None = None) -> str
                     scaled = (band - low) / (high - low) * 255.0
                     enhanced[band_index] = np.clip(scaled, 0, 255).astype(np.uint8)
 
-            # The vision model accepts RGB images; retain the first three raster bands.
             if enhanced.shape[0] == 1:
                 rgb = np.repeat(enhanced, 3, axis=0)
             elif enhanced.shape[0] == 2:
@@ -70,7 +68,6 @@ def _image_data_uri(image: ImageModel, region: RegionModel | None = None) -> str
                 rgb = enhanced[:3]
             converted = Image.fromarray(np.transpose(rgb, (1, 2, 0)), mode="RGB")
     except (rasterio.errors.RasterioIOError, ValueError):
-        # Standard RGB uploads do not expose raster bands through Rasterio.
         with Image.open(path) as source:
             converted = source.convert("RGB")
             if region and region.pixel_bounds:
@@ -89,7 +86,6 @@ def _image_data_uri(image: ImageModel, region: RegionModel | None = None) -> str
 
 
 def _image_agent_metadata(image: ImageModel, region: RegionModel | None = None) -> dict:
-    """Serialize database metadata for the model without exposing ORM objects."""
     metadata = {
         "filename": image.filename,
         "crs": image.crs,
@@ -99,6 +95,7 @@ def _image_agent_metadata(image: ImageModel, region: RegionModel | None = None) 
         "width_px": image.width_px,
         "height_px": image.height_px,
         "metadata_json": image.metadata_json or {},
+        "image_id": str(image.id),
     }
     if region:
         metadata["region"] = {
@@ -108,7 +105,9 @@ def _image_agent_metadata(image: ImageModel, region: RegionModel | None = None) 
     return metadata
 
 
-async def _chat_history(image_id: uuid.UUID, db: AsyncSession) -> list[dict[str, str]]:
+async def _chat_history(image_id: uuid.UUID | None, db: AsyncSession) -> list[dict[str, str]]:
+    if not image_id:
+        return []
     result = await db.execute(
         select(QueryModel)
         .where(QueryModel.image_id == image_id)
@@ -126,11 +125,8 @@ async def _chat_history(image_id: uuid.UUID, db: AsyncSession) -> list[dict[str,
 async def stream_query(
     query_id: uuid.UUID,
     request: QueryRequest,
-    image: ImageModel,
-    region: RegionModel | None,
     db: AsyncSession
 ) -> AsyncGenerator[str, None]:
-    """Stream SSE events for the query trace and execution."""
     
     def format_sse(event: str, data: dict) -> str:
         return f"event: {event}\ndata: {json.dumps(data)}\n\n"
@@ -140,23 +136,56 @@ async def stream_query(
             return format_sse("stage", {"stage": stage_name, "status": status, "data": data or {}})
 
         yield stage("input_validation", "running")
-        yield stage("input_validation", "complete")
 
-        # Step 2: Extract image crop if region is provided
-        yield stage("image_preparation", "running", {"region": region.name if region else None})
-        yield stage("image_preparation", "complete", {"region": region.name if region else None})
-
-        # Step 3: Call Model Server AGENT (LangGraph multi-agent orchestrator)
-        yield stage("agent_graph", "running")
-
-        image_data = _image_data_uri(image, region)
+        # Resolve images
         agent_payload = {
+            "mode": request.mode,
             "question": request.question,
-            "image": image_data,
-            "region_name": region.name if region else "",
-            "metadata": _image_agent_metadata(image, region),
             "chat_history": await _chat_history(request.image_id, db),
+            "image": "",
+            "before": "",
+            "after": "",
+            "optical": "",
+            "sar": "",
+            "metadata": {}
         }
+        
+        primary_image = None
+        region = None
+
+        if request.image_id:
+            img = (await db.execute(select(ImageModel).where(ImageModel.id == request.image_id))).scalar_one_or_none()
+            if img:
+                primary_image = img
+                if request.region_id:
+                    region = (await db.execute(select(RegionModel).where(RegionModel.id == request.region_id))).scalar_one_or_none()
+                agent_payload["image"] = _image_data_uri(img, region)
+                agent_payload["metadata"] = _image_agent_metadata(img, region)
+                if region:
+                    agent_payload["region_name"] = region.name
+                    
+        if request.before_image_id and request.after_image_id:
+            b_img = (await db.execute(select(ImageModel).where(ImageModel.id == request.before_image_id))).scalar_one_or_none()
+            a_img = (await db.execute(select(ImageModel).where(ImageModel.id == request.after_image_id))).scalar_one_or_none()
+            if b_img and a_img:
+                primary_image = a_img
+                agent_payload["before"] = _image_data_uri(b_img)
+                agent_payload["after"] = _image_data_uri(a_img)
+                if not agent_payload["metadata"]:
+                    agent_payload["metadata"] = _image_agent_metadata(a_img)
+                    
+        if request.optical_image_id and request.sar_image_id:
+            o_img = (await db.execute(select(ImageModel).where(ImageModel.id == request.optical_image_id))).scalar_one_or_none()
+            s_img = (await db.execute(select(ImageModel).where(ImageModel.id == request.sar_image_id))).scalar_one_or_none()
+            if o_img and s_img:
+                primary_image = o_img
+                agent_payload["optical"] = _image_data_uri(o_img)
+                agent_payload["sar"] = _image_data_uri(s_img)
+                if not agent_payload["metadata"]:
+                    agent_payload["metadata"] = _image_agent_metadata(o_img)
+
+        yield stage("input_validation", "complete")
+        yield stage("agent_graph", "running")
         
         async with httpx.AsyncClient(base_url=settings.model_server_url, timeout=90.0) as client:
             model_response = await client.post("/agent", json=agent_payload)
@@ -165,6 +194,7 @@ async def stream_query(
             
         for item in result.get("stages", []):
             yield stage(item["stage"], item["status"], item.get("data", {}))
+            
         yield stage("report_generator", "complete", {
             "answer": result.get("answer", ""),
             "evidence": result.get("evidence", []),
@@ -172,22 +202,23 @@ async def stream_query(
             "change_mask": result.get("change_mask"),
             "change_pct": result.get("change_pct"),
             "agreement_pct": result.get("agreement_pct"),
+            "segment_mask": result.get("segment_mask"),
         })
 
-        # Save to DB
-        db_query = QueryModel(
-            id=query_id,
-            image_id=request.image_id,
-            region_id=request.region_id,
-            question=request.question,
-            answer=result["answer"],
-            confidence=result.get("confidence", 0.88),
-            evidence=result.get("evidence", []),
-            execution_trace=[{"step_name": "Running VQA", "status": "completed", "duration_ms": 1200}],
-            model_used=result.get("tool_used", "agent")
-        )
-        db.add(db_query)
-        await db.commit()
+        if primary_image:
+            db_query = QueryModel(
+                id=query_id,
+                image_id=primary_image.id,
+                region_id=request.region_id,
+                question=request.question,
+                answer=result.get("answer", ""),
+                confidence=result.get("confidence", 0.88),
+                evidence=result.get("evidence", []),
+                execution_trace=[{"step_name": "Agent Execution", "status": "completed", "duration_ms": 1000}],
+                model_used=result.get("tool_used", "agent")
+            )
+            db.add(db_query)
+            await db.commit()
 
         yield stage("persist_db", "complete", {
             "query_id": str(query_id),
@@ -200,74 +231,19 @@ async def stream_query(
 
 @router.post("/", response_class=StreamingResponse)
 async def submit_query(request: QueryRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
-    """Submit a VQA query and return an SSE stream."""
-    
-    # Validate image
-    result = await db.execute(select(ImageModel).where(ImageModel.id == request.image_id))
-    image = result.scalar_one_or_none()
-    if not image:
-        raise HTTPException(status_code=404, detail="Image not found")
-
-    # Validate region if provided
-    region = None
-    if request.region_id:
-        result = await db.execute(select(RegionModel).where(RegionModel.id == request.region_id))
-        region = result.scalar_one_or_none()
-        if not region:
-            raise HTTPException(status_code=404, detail="Region not found")
-
     query_id = uuid.uuid4()
     
-    # Check if client wants streaming
     accept = http_request.headers.get("accept", "")
     if "text/event-stream" in accept:
         return StreamingResponse(
-            stream_query(query_id, request, image, region, db),
+            stream_query(query_id, request, db),
             media_type="text/event-stream"
         )
-    
-    # Non-streaming fallback
-    agent_payload = {
-        "question": request.question,
-        "image": _image_data_uri(image),
-        "region_name": "",
-        "metadata": _image_agent_metadata(image),
-        "chat_history": await _chat_history(request.image_id, db),
-    }
-    try:
-        model_response = await http_client.post("/agent", json=agent_payload)
-        model_response.raise_for_status()
-        result = model_response.json()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Model server error: {e}")
+    raise HTTPException(status_code=400, detail="Only SSE is supported.")
 
-    # Save to DB
-    db_query = QueryModel(
-        id=query_id,
-        image_id=request.image_id,
-        region_id=request.region_id,
-        question=request.question,
-        answer=result["answer"],
-        confidence=result["confidence"],
-        evidence=result.get("evidence", []),
-        execution_trace=[{"step_name": "Running VQA", "status": "completed", "duration_ms": 500}],
-        model_used=result.get("tool_used", "agent")
-    )
-    db.add(db_query)
-    await db.commit()
-
-    return QueryResponse(
-        query_id=query_id,
-        answer=result["answer"],
-        confidence=result.get("confidence", 0.88),
-        evidence=result.get("evidence", []),
-        execution_trace=[{"step_name": "Running VQA", "status": "completed", "duration_ms": 500}],
-        model_used=result.get("tool_used", "agent")
-    )
 
 @router.get("/{image_id}")
 async def get_queries(image_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Fetch previous queries for a specific image to restore chat history."""
     result = await db.execute(
         select(QueryModel)
         .where(QueryModel.image_id == image_id)

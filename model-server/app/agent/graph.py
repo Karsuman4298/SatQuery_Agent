@@ -10,19 +10,17 @@ State flows: START → router → executor → END
 """
 
 from __future__ import annotations
-
 import json
 from typing import Any, Annotated
 import operator
-
 import httpx
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
-
 from app.config import settings
 from app.openrouter import call_model_with_schema
 from app.agent.state import RouterDecision
+
 from app.agent.tools import (
     vqa_tool,
     change_analysis_tool,

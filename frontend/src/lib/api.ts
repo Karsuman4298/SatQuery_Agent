@@ -1,15 +1,15 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// Backend (FastAPI gateway) on port 8000, Model-server on port 8001
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+const MODEL_SERVER_URL = import.meta.env.VITE_MODEL_SERVER_URL || "http://localhost:8001";
 
-/**
- * Upload an image to the backend and extract metadata.
- */
+/* ─── Image Upload (to backend gateway) ─────────────────────────────── */
 export async function uploadImage(file: File, sensor?: string, description?: string) {
   const formData = new FormData();
   formData.append("file", file);
   if (sensor) formData.append("sensor", sensor);
   if (description) formData.append("description", description);
 
-  const response = await fetch(`${API_BASE_URL}/images/upload`, {
+  const response = await fetch(`${BACKEND_URL}/images/upload`, {
     method: "POST",
     body: formData,
   });
@@ -22,105 +22,99 @@ export async function uploadImage(file: File, sensor?: string, description?: str
   return response.json();
 }
 
-/**
- * Create a named region for an image.
- */
-export async function createRegion(imageId: string, name: string, pixelBounds: any) {
-  const response = await fetch(`${API_BASE_URL}/regions/`, {
+/* ─── Region CRUD (to backend gateway) ──────────────────────────────── */
+export async function createRegion(imageId: string, name: string, pixelBounds: unknown) {
+  const response = await fetch(`${BACKEND_URL}/regions/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      image_id: imageId,
-      name,
-      pixel_bounds: pixelBounds,
-    }),
+    body: JSON.stringify({ image_id: imageId, name, pixel_bounds: pixelBounds }),
   });
   if (!response.ok) throw new Error("Failed to create region");
   return response.json();
 }
 
-/**
- * List all regions for an image.
- */
 export async function listRegions(imageId: string) {
-  const response = await fetch(`${API_BASE_URL}/regions/${imageId}`);
+  const response = await fetch(`${BACKEND_URL}/regions/${imageId}`);
   if (!response.ok) throw new Error("Failed to list regions");
   return response.json();
 }
 
-/**
- * Returns a configured EventSource for streaming the VQA query.
- */
-export function streamQuery(imageId: string, question: string, regionId?: string) {
-  const url = new URL(`${API_BASE_URL}/query/`);
-  return fetch(url.toString(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "text/event-stream",
-    },
-    body: JSON.stringify({
-      image_id: imageId,
-      region_id: regionId,
-      question,
-    }),
-  });
+/* ─── Agent Query (to model-server directly) ─────────────────────────
+ *  Sends image as base64, receives full JSON response (not SSE).
+ *  WorkspacePage converts it into the streaming-like chat format.
+ * ────────────────────────────────────────────────────────────────── */
+export interface AgentQueryOptions {
+  question: string;
+  imageBase64?: string;       // primary image
+  beforeBase64?: string;      // change-detection: before
+  afterBase64?: string;       // change-detection: after
+  opticalBase64?: string;     // fusion: optical
+  sarBase64?: string;         // fusion: SAR
+  regionName?: string;
+  clickPoint?: [number, number] | null;
+  chatHistory?: { role: "user" | "assistant"; content: string }[];
+  metadata?: Record<string, unknown>;
 }
 
-/**
- * Submit temporal image pair for change detection.
- */
-export async function submitTemporal(beforeImageId: string, afterImageId: string) {
-  const response = await fetch(`${API_BASE_URL}/temporal/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      before_image_id: beforeImageId,
-      after_image_id: afterImageId,
-    }),
-  });
-  if (!response.ok) throw new Error("Failed to submit temporal pair");
-  return response.json();
-}
+export async function queryAgent(opts: AgentQueryOptions): Promise<{
+  answer: string;
+  tool_used: string;
+  confidence: number;
+  segment_mask?: string;
+  execution_summary?: Record<string, unknown>;
+  evidence?: Record<string, unknown>[];
+  errors?: unknown[];
+}> {
+  const body = {
+    question: opts.question,
+    mode: "vqa",                          // classifier re-routes internally
+    image: opts.imageBase64 || "",
+    before: opts.beforeBase64 || "",
+    after: opts.afterBase64 || "",
+    optical: opts.opticalBase64 || "",
+    sar: opts.sarBase64 || "",
+    region_name: opts.regionName || "",
+    click_point: opts.clickPoint || null,
+    chat_history: opts.chatHistory || [],
+    metadata: opts.metadata || {},
+  };
 
-/**
- * Get change result by id
- */
-export async function getChangeResult(changeId: string) {
-  const response = await fetch(`${API_BASE_URL}/temporal/${changeId}`);
-  if (!response.ok) throw new Error("Failed to get change result");
-  return response.json();
-}
-
-/**
- * Submit optical-SAR pair for fusion verification
- */
-export async function verifyFusion(opticalId: string, sarId: string, regionId?: string) {
-  const response = await fetch(`${API_BASE_URL}/optical-sar/verify`, {
+  const response = await fetch(`${MODEL_SERVER_URL}/agent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      optical_image_id: opticalId,
-      sar_image_id: sarId,
-      region_id: regionId || null,
-    }),
+    body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("Failed to verify fusion");
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    let errMsg = err?.detail;
+    if (Array.isArray(errMsg)) {
+      errMsg = errMsg.map((e: any) => e.msg).join(', ');
+    }
+    throw new Error(errMsg || `Agent query failed: ${response.status}`);
+  }
+
   return response.json();
 }
 
-/**
- * Download report url
- */
+/* ─── Legacy streamQuery shim (kept for compatibility) ──────────────── */
+export function streamQuery(imageId: string, question: string, _regionId?: string) {
+  // Old SSE path — hits backend gateway
+  const url = `${BACKEND_URL}/agent/`;
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify({ image_id: imageId, question }),
+  });
+}
+
+/* ─── Report helpers ─────────────────────────────────────────────────── */
 export function getReportUrl(queryId: string, format: "geojson" | "pdf" = "geojson") {
-  return `${API_BASE_URL}/reports/${queryId}?format=${format}`;
+  return `${BACKEND_URL}/reports/${queryId}?format=${format}`;
 }
 
-/**
- * Fetch previous queries for a specific image to restore chat history.
- */
 export async function fetchQueries(imageId: string) {
-  const response = await fetch(`${API_BASE_URL}/query/${imageId}`);
+  const response = await fetch(`${BACKEND_URL}/agent/${imageId}`);
   if (!response.ok) throw new Error("Failed to fetch queries");
   return response.json();
 }

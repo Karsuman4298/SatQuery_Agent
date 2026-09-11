@@ -50,12 +50,10 @@ app.add_middleware(
 )
 
 # Register routers
-from app.routers import images, regions, query, temporal, fusion, reports
+from app.routers import images, regions, query, reports
 app.include_router(images.router, prefix="/images", tags=["images"])
 app.include_router(regions.router, prefix="/regions", tags=["regions"])
-app.include_router(query.router, prefix="/query", tags=["query"])
-app.include_router(temporal.router, prefix="/temporal", tags=["temporal"])
-app.include_router(fusion.router, prefix="/optical-sar", tags=["fusion"])
+app.include_router(query.router, prefix="/agent", tags=["agent"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
 
 

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
+from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 SourceType = Literal["observation", "interpretation", "calculation", "metadata", "unsupported"]
@@ -17,6 +18,12 @@ class BBox(BaseModel):
     x_max: float
     y_max: float
     crs: Optional[str] = None
+
+
+class LocalizeResponse(BaseModel):
+    bbox: Optional[BBox] = None
+    point_x: Optional[float] = Field(None, description="The X coordinate of a point strictly on the object (0-1000 scale). Must be inside the bbox.")
+    point_y: Optional[float] = Field(None, description="The Y coordinate of a point strictly on the object (0-1000 scale). Must be inside the bbox.")
 
 
 class EvidenceItem(BaseModel):
@@ -65,7 +72,19 @@ class RouterDecision(BaseModel):
 
 
 class AnswerResponse(BaseModel):
+    observed_features: str
+    interpretation: str
+    uncertainty: str
+
+    @computed_field
+    @property
+    def answer(self) -> str:
+        return f"Observed features: {self.observed_features}\nInterpretation: {self.interpretation}\nUncertainty: {self.uncertainty}"
+
+
+class ConversationalResponse(BaseModel):
     answer: str
+    referenced_turn: Optional[int] = None
 
 
 class ChangeSummaryResponse(BaseModel):
@@ -75,6 +94,16 @@ class ChangeSummaryResponse(BaseModel):
 class FusionResponse(BaseModel):
     analysis: str
     agreement_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+
+class CaptionResponse(BaseModel):
+    caption: str
+
+
+class ClarificationResponse(BaseModel):
+    """Returned when the classified task cannot be fulfilled with the given inputs."""
+    inferred_task: str
+    message: str
+    missing_inputs: list[str] = []
 
 
 class ClaimJudgment(BaseModel):
@@ -87,8 +116,17 @@ class JudgeResponse(BaseModel):
     judgments: List[ClaimJudgment] = Field(default_factory=list)
 
 
+class TraceEntry(BaseModel):
+    node: str
+    timestamp: datetime
+    reasoning: Optional[str] = None
+    input_summary: dict = Field(default_factory=dict)
+    output_summary: dict = Field(default_factory=dict)
+    duration_ms: float = 0.0
+
+
 class TaskType(BaseModel):
-    kind: TaskKind
+    kind: Union[TaskKind, Literal["conversational"]]
     requires_pair: bool = False
     requires_sar: bool = False
 
@@ -103,9 +141,19 @@ class GraphState(BaseModel):
 
     validated: bool = False
     validation_errors: List[str] = Field(default_factory=list)
+    missing_inputs: List[str] = Field(default_factory=list)
     sensor_metadata: Dict[str, SensorMetadata] = Field(default_factory=dict)
     quality_report: Dict[str, QualityReport] = Field(default_factory=dict)
+    
+    mode: Literal["vqa", "segmentation", "change_detection", "fusion", "conversational"] = "vqa"
     task_type: Optional[TaskType] = None
+    inferred_task: Optional[str] = None
+    task_routing_reason: str = ""
+    classifier_scores: Dict[str, float] = Field(default_factory=dict)
+    classifier_confidence: float = 0.0
+    needs_clarification: bool = False
+    clarification_message: str = ""
+    model_used: Optional[str] = None
 
     scene_observations: List[Observation] = Field(default_factory=list)
     land_cover: Optional[Dict[str, Any]] = None
@@ -116,11 +164,13 @@ class GraphState(BaseModel):
     uncertainty: Dict[str, Any] = Field(default_factory=dict)
     validation_report: Dict[str, Any] = Field(default_factory=dict)
 
-    final_answer: str = ""
+    final_answer: Union[AnswerResponse, ConversationalResponse, str] = ""
     tool_result: Dict[str, Any] = Field(default_factory=dict)
     errors: List[Dict[str, Any]] = Field(default_factory=list)
-    trace: List[Dict[str, Any]] = Field(default_factory=list)
+    trace: List[TraceEntry] = Field(default_factory=list)
 
     def public_dict(self) -> Dict[str, Any]:
         """Serialize only user-facing artifacts; never expose internal trace."""
         return self.model_dump(exclude={"trace", "image_context"})
+
+GraphState.model_rebuild()

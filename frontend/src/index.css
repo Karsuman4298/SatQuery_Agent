@@ -1,0 +1,67 @@
+/* SatQuery AI — Global Styles */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --space-bg: #020408;
+  --space-navy: #050d1a;
+  --earth-blue: #1a4b8e;
+  --atmos-rim: #4db8ff;
+  --atmos-glow: #2288cc;
+  --city-lights: #ffd166;
+  --brand-green: #00ff88;
+  --accent-cyan: #00d4ff;
+  --text-white: #f0f4f8;
+  --text-muted: #6b7fa3;
+  --text-dim: #3a4a62;
+  --pixel-green: #00cc66;
+  --pixel-cyan: #00aadd;
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--space-bg);
+  color: var(--text-white);
+}
+
+#root {
+  width: 100%;
+  min-height: 100%;
+  position: relative;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--space-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border-radius: 2px;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 3px;
+  border-radius: 3px;
+}

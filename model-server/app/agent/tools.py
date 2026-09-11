@@ -33,12 +33,20 @@ def _clean_b64(image_str: str) -> str:
     return image_str
 
 
-def _encode_mask_png(mask: "np.ndarray") -> str:
-    """Encode a numpy uint8 mask array as a base64 PNG string."""
-    img = Image.fromarray(mask)
+def _encode_mask_png(mask: np.ndarray) -> str:
+    from PIL import Image as PILImage
+    import io, base64
+    if mask.max() == 1:
+        mask = mask * 255
+        
+    # Convert grayscale mask to an RGBA image where mask is neon green
+    rgba = np.zeros((mask.shape[0], mask.shape[1], 4), dtype=np.uint8)
+    rgba[mask > 0] = [52, 211, 153, 255] # Emerald-400
+    
+    img = PILImage.fromarray(rgba, mode="RGBA")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 
 def _remote_sensing_prompt(question: str) -> str:
@@ -176,6 +184,8 @@ def _mock_vqa(question: str) -> dict:
 
 # ─── Tool 1: VQA ──────────────────────────────────────────────────────────────
 
+from app.openrouter import call_model_with_schema, image_data_uri, with_graceful_degradation
+
 @tool
 async def vqa_tool(
     image: str,
@@ -198,27 +208,79 @@ async def vqa_tool(
     """
     metadata_context = json.dumps(metadata or {}, default=str)
     observation_context = "\n".join(f"- {item}" for item in (observations or []))
-    answer_result = await call_model_with_schema([
-        {
-            "role": "system",
-            "content": f"{_remote_sensing_prompt(question)}\n\nMetadata is authoritative only for file properties, not visual content:\n{metadata_context}\n\nValidated visual observations (use as evidence, do not expand beyond them):\n{observation_context or '- None available.'}",
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": f"Question: {question}"},
-                {"type": "image_url", "image_url": {"url": image_data_uri(image)}},
-            ],
-        },
-    ], AnswerResponse, max_tokens=700, temperature=0.0)
-    return {"answer": _clean_model_answer(answer_result.answer), "confidence": 0.0, "evidence": [], "observations": observation_context or '- None available.'}
+    try:
+        answer_result, reasoning = await call_model_with_schema([
+            {
+                "role": "system",
+                "content": f"{_remote_sensing_prompt(question)}\n\nMetadata is authoritative only for file properties, not visual content:\n{metadata_context}\n\nValidated visual observations (use as evidence, do not expand beyond them):\n{observation_context or '- None available.'}",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"Question: {question}"},
+                    {"type": "image_url", "image_url": {"url": image_data_uri(image)}},
+                ],
+            },
+        ], AnswerResponse, max_tokens=700, temperature=0.0)
+        return {"answer": answer_result.answer, "confidence": 0.0, "evidence": [], "observations": observation_context or '- None available.', "internal_reasoning": reasoning}
+    except Exception:
+        return {"answer": f"Analysis unavailable for your question: '{question}'", "confidence": 0.0, "evidence": [], "observations": ""}
+
+@tool
+async def land_cover_tool(image: str, question: str = "Describe the land cover in this scene.") -> dict:
+    """Deterministic land-cover classification over the scene."""
+    import torch
+    import torchvision.transforms as T
+    from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large, DeepLabV3_MobileNet_V3_Large_Weights
+
+    try:
+        raw = base64.b64decode(_clean_b64(image))
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        
+        weights = DeepLabV3_MobileNet_V3_Large_Weights.DEFAULT
+        model = deeplabv3_mobilenet_v3_large(weights=weights)
+        model.eval()
+        
+        preprocess = T.Compose([
+            T.ToTensor(),
+            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        
+        input_tensor = preprocess(img).unsqueeze(0)
+        with torch.no_grad():
+            output = model(input_tensor)['out'][0]
+        preds = output.argmax(0).numpy()
+        
+        total_pixels = preds.size
+        classes, counts = np.unique(preds, return_counts=True)
+        
+        # Extremely simplified mapping for demonstration
+        vocab = weights.meta["categories"]
+        results = {}
+        for cls_idx, count in zip(classes, counts):
+            cls_name = vocab[cls_idx]
+            pct = (count / total_pixels) * 100
+            if pct > 1.0:
+                results[cls_name] = round(pct, 1)
+        
+        stats_str = ", ".join(f"{k}: {v}%" for k, v in results.items())
+        
+        # VLM step to narrate the classification output
+        narrate_result, reasoning = await call_model_with_schema([
+            {"role": "system", "content": "You are a land cover analyst. Narrate the deterministic classification results provided by the CV model. Do not invent classes."},
+            {"role": "user", "content": f"Classification output: {stats_str}. User asked: '{question}'. Narrate this in a brief sentence relevant to the user's question."}
+        ], AnswerResponse, max_tokens=200, temperature=0.0)
+        
+        return {"answer": narrate_result.answer, "confidence": 0.0, "evidence": [], "internal_reasoning": reasoning}
+    except Exception as exc:
+        raise RuntimeError(f"Land cover classification failed: {exc}") from exc
 
 
 
 # ─── Tool 2: Change Detection ─────────────────────────────────────────────────
 
 @tool
-async def change_analysis_tool(before: str, after: str) -> dict:
+async def change_analysis_tool(before: str, after: str, question: str = "Describe observable changes in a brief summary.") -> dict:
     """
     Bi-temporal change detection between two co-registered satellite images.
 
@@ -266,22 +328,24 @@ async def change_analysis_tool(before: str, after: str) -> dict:
 
     change_mask, change_pct = _diff_mask(before, after)
 
-    summary_result = await call_model_with_schema([
-        {
-            "role": "system",
-            "content": "You are a careful remote-sensing change analyst. Describe only visible differences; do not infer causes or exact quantities beyond the supplied pixel mask.",
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Image 1 is BEFORE and Image 2 is AFTER. Describe observable changes and uncertainty."},
-                {"type": "image_url", "image_url": {"url": image_data_uri(before)}},
-                {"type": "image_url", "image_url": {"url": image_data_uri(after)}},
-            ],
-        },
-    ], ChangeSummaryResponse, max_tokens=800, temperature=0.0)
-
-    return {"change_mask": change_mask, "change_pct": change_pct, "summary": summary_result.summary}
+    try:
+        summary_result, reasoning = await call_model_with_schema([
+            {
+                "role": "system",
+                "content": "You are a careful remote-sensing change analyst. Narrate the provided change percentage in the context of the user's query. Do not infer causes or exact quantities beyond what is provided.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"Computed pixel change: {change_pct}%. Image 1 is BEFORE and Image 2 is AFTER. User asked: '{question}'. Describe observable changes relevant to this question."},
+                    {"type": "image_url", "image_url": {"url": image_data_uri(before)}},
+                    {"type": "image_url", "image_url": {"url": image_data_uri(after)}},
+                ],
+            },
+        ], ChangeSummaryResponse, max_tokens=800, temperature=0.0)
+        return {"change_mask": change_mask, "change_pct": change_pct, "summary": summary_result.summary, "internal_reasoning": reasoning}
+    except Exception:
+        return {"change_mask": change_mask, "change_pct": change_pct, "summary": f"Change analysis unavailable for query: '{question}'"}
 
 
 # ─── Tool 3: Optical-SAR Fusion ───────────────────────────────────────────────
@@ -303,117 +367,200 @@ async def fusion_analysis_tool(optical: str, sar: str, question: str = "") -> di
         dict with keys: verification_result (str), confidence (float),
         agreement_pct (float), details (dict).
     """
-    result = await call_model_with_schema([
-        {
-            "role": "system",
-            "content": "You are a careful multi-modal remote-sensing analyst. Compare only visible evidence in the optical and SAR images. Do not invent features or an agreement percentage; state when agreement cannot be estimated reliably.",
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": question or "Compare the optical and SAR images and report agreements, disagreements, and uncertainty."},
-                {"type": "image_url", "image_url": {"url": image_data_uri(optical)}},
-                {"type": "image_url", "image_url": {"url": image_data_uri(sar)}},
-            ],
-        },
-    ], FusionResponse, max_tokens=900, temperature=0.0)
-    return {
-        "verification_result": result.analysis,
-        "confidence": 0.0,
-        "agreement_pct": result.agreement_pct or 0.0,
-        "details": {"modalities": ["optical", "SAR"], "model": settings.vision_language_model},
-    }
+    try:
+        opt_raw = base64.b64decode(_clean_b64(optical))
+        sar_raw = base64.b64decode(_clean_b64(sar))
+        opt_arr = np.array(Image.open(io.BytesIO(opt_raw)).convert("L").resize((256, 256)))
+        sar_arr = np.array(Image.open(io.BytesIO(sar_raw)).convert("L").resize((256, 256)))
+        opt_norm = (opt_arr - np.mean(opt_arr)) / (np.std(opt_arr) + 1e-5)
+        sar_norm = (sar_arr - np.mean(sar_arr)) / (np.std(sar_arr) + 1e-5)
+        correlation = np.mean(opt_norm * sar_norm)
+        agreement_pct = max(0.0, min(100.0, (correlation + 1) * 50))
+    except Exception:
+        agreement_pct = 50.0
 
-    model_id = "Qwen/Qwen2-VL-7B-Instruct"
-    api_url = f"https://router.huggingface.co/hf-inference/models/{model_id}/v1/chat/completions"
-
-    opt_uri = optical if optical.startswith("data:image") else f"data:image/png;base64,{optical}"
-    sar_uri = sar if sar.startswith("data:image") else f"data:image/png;base64,{sar}"
-
-    user_q = question or "Analyze and cross-validate both images. Report agreement, disagreement, and any unique information each modality provides."
-
-    payload = {
-        "model": model_id,
-        "messages": [
+    try:
+        result, reasoning = await call_model_with_schema([
+            {
+                "role": "system",
+                "content": "You are a careful multi-modal remote-sensing analyst. Compare only visible evidence in the optical and SAR images. Narrate the provided structural agreement score. Do not invent features or a different agreement percentage.",
+            },
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "You are an expert in multi-modal remote sensing. "
-                            "You are provided with two co-registered images of the same scene: "
-                            "Image 1 is optical/multispectral and Image 2 is SAR (Synthetic Aperture Radar). "
-                            f"Task: {user_q}\n"
-                            "Provide your analysis in a structured paragraph. "
-                            "End with an estimated agreement percentage (0-100%)."
-                        ),
-                    },
-                    {"type": "image_url", "image_url": {"url": opt_uri}},
-                    {"type": "image_url", "image_url": {"url": sar_uri}},
+                    {"type": "text", "text": f"Computed structural agreement score is {agreement_pct:.1f}%. {question or 'Compare the optical and SAR images and report agreements, disagreements, and uncertainty.'}"},
+                    {"type": "image_url", "image_url": {"url": image_data_uri(optical)}},
+                    {"type": "image_url", "image_url": {"url": image_data_uri(sar)}},
                 ],
-            }
-        ],
-        "max_tokens": 512,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
-            resp = await client.post(
-                api_url,
-                headers={"Authorization": f"Bearer {hf_token}", "Content-Type": "application/json"},
-                json=payload,
-            )
-            resp.raise_for_status()
-            result_text = resp.json()["choices"][0]["message"]["content"].strip()
-
-        # Parse agreement percentage from response
-        import re
-        match = re.search(r"(\d{1,3})\s*%", result_text)
-        agr_pct = float(match.group(1)) if match else 75.0
-
+            },
+        ], FusionResponse, max_tokens=900, temperature=0.0)
         return {
-            "verification_result": result_text,
-            "confidence": 0.88,
-            "agreement_pct": agr_pct,
-            "details": {"modalities": ["optical", "SAR"], "model_used": model_id},
+            "verification_result": result.analysis,
+            "confidence": 0.0,
+            "agreement_pct": agreement_pct,
+            "internal_reasoning": reasoning,
+            "details": {"modalities": ["optical", "SAR"], "model": settings.vision_language_model},
         }
     except Exception:
-        raise
+        return {
+            "verification_result": f"Analysis unavailable for query: '{question}'",
+            "confidence": 0.0,
+            "agreement_pct": agreement_pct,
+            "details": {"modalities": ["optical", "SAR"]}
+        }
 
 
 # ─── Tool 4: Segmentation ─────────────────────────────────────────────────────
 
-@tool
-async def segmentation_tool(image: str, point: list) -> dict:
-    """
-    Segment a specific object or region in the satellite image using a click point.
+async def localize_region(image: str, region_description: str) -> Optional[dict]:
+    """Call the VLM to get a bounding box for the region."""
+    from app.agent.state import LocalizeResponse
+    result, reasoning = await call_model_with_schema([
+        {"role": "system", "content": "You are a localization module. Return a pixel bounding box for the described region. For complex or non-convex shapes like rivers, you MUST also provide an exact point (point_x, point_y) that falls STRICTLY on the requested object itself, NOT just the center of the bounding box. Never guess if you aren't confident."},
+        {"role": "user", "content": [
+            {"type": "text", "text": f"Locate: {region_description}"},
+            {"type": "image_url", "image_url": {"url": image_data_uri(image)}}
+        ]}
+    ], LocalizeResponse, max_tokens=200, temperature=0.0)
+    
+    if result.bbox:
+        return {"bbox": result.bbox.model_dump(), "internal_reasoning": reasoning}
+    return {"bbox": None, "internal_reasoning": reasoning}
 
-    Use this tool when the user clicks on a location in the image and wants
+@tool
+async def segmentation_tool(image: str, point: Optional[list] = None, region_description: Optional[str] = None) -> dict:
+    """
+    Segment a specific object or region in the satellite image using a click point or text description.
+
+    Use this tool when the user clicks on a location in the image or describes a region and wants
     to isolate or outline a specific object (building, field, water body, etc.).
 
     Args:
         image: Base64-encoded satellite image.
         point: [x, y] pixel coordinates of the user's click on the image.
+        region_description: Natural language description of the region to segment.
 
     Returns:
         dict with keys: mask (base64 PNG of the segmentation mask).
     """
-    # Deterministic local mask until a real SAM2 checkpoint is configured.
+    reasoning = None
+    bboxes = None
+    if not point and region_description:
+        loc_result = await localize_region(image, region_description)
+        reasoning = loc_result.get("internal_reasoning")
+        if not loc_result.get("bbox"):
+            return {"mask": "", "error": "please click the region", "internal_reasoning": reasoning}
+        
+        # Check if model provided a specific point on the object
+        px, py = loc_result.get("point_x"), loc_result.get("point_y")
+        if px is not None and py is not None and (px != 0 and py != 0):
+            point = [px, py]
+        else:
+            # For complex shapes like rivers, the center of the bbox is often land.
+            # But the edges of a tight bounding box MUST touch the object.
+            # We generate 4 points on the edges of the bbox and use them as point prompts.
+            bbox = loc_result["bbox"]
+            cx = (bbox["x_min"] + bbox["x_max"]) / 2
+            cy = (bbox["y_min"] + bbox["y_max"]) / 2
+            # Offset slightly inward to ensure they are on the object, not outside
+            dx = (bbox["x_max"] - bbox["x_min"]) * 0.05
+            dy = (bbox["y_max"] - bbox["y_min"]) * 0.05
+            
+            p1 = [cx, bbox["y_min"] + dy]
+            p2 = [cx, bbox["y_max"] - dy]
+            p3 = [bbox["x_min"] + dx, cy]
+            p4 = [bbox["x_max"] - dx, cy]
+            
+            # FastSAM predict takes a list of points. We'll pass all 4 edge points.
+            point = p1 # We will actually pass multiple points below
+            bboxes = None
+            multi_points = [p1, p2, p3, p4]
+
+    if not point and not bboxes and not 'multi_points' in locals():
+        return {"mask": "", "error": "please click the region", "internal_reasoning": reasoning}
+
     try:
+        import torch
+        from ultralytics import SAM
         raw = base64.b64decode(_clean_b64(image))
-        arr = np.array(Image.open(io.BytesIO(raw)).convert("L").resize((256, 256)))
-        mask = np.zeros_like(arr, dtype=np.uint8)
-        cx = min(max(int(point[0] * 256 / max(arr.shape[1], 1)), 5), 250)
-        cy = min(max(int(point[1] * 256 / max(arr.shape[0], 1)), 5), 250)
-        seed_val = arr[cy, cx]
-        tolerance = 30
-        flood_mask = np.abs(arr.astype(int) - int(seed_val)) < tolerance
-        mask[flood_mask] = 255
-        # Restrict to a reasonable radius from click
-        y_grid, x_grid = np.ogrid[-cy: 256 - cy, -cx: 256 - cx]
-        radius_mask = (x_grid * x_grid + y_grid * y_grid) <= 70 ** 2
-        mask[~radius_mask] = 0
-        return {"mask": _encode_mask_png(mask)}
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        
+        multi_points_scaled = []
+        if 'multi_points' in locals():
+            for p in multi_points:
+                if max(p) > 1.0 and max(p) <= 1000:
+                    multi_points_scaled.append([p[0] / 1000 * img.width, p[1] / 1000 * img.height])
+                elif max(p) <= 1.0:
+                    multi_points_scaled.append([p[0] * img.width, p[1] * img.height])
+                else:
+                    multi_points_scaled.append(p)
+                    
+        # Scale point if normalized to 1000 bins (legacy)
+        elif point and max(point) > 1.0 and max(point) <= 1000:
+            point = [point[0] / 1000 * img.width, point[1] / 1000 * img.height]
+        elif point and max(point) <= 1.0:
+            point = [point[0] * img.width, point[1] * img.height]
+        
+        # If coordinates are normalized to 1000 (Qwen's native bin format), scale to pixels
+        if bboxes:
+            b = bboxes[0]
+            if max(b) > 1.0 and max(b) <= 1000:
+                bboxes = [[b[0] / 1000 * img.width, b[1] / 1000 * img.height, b[2] / 1000 * img.width, b[3] / 1000 * img.height]]
+            elif max(b) <= 1.0:
+                bboxes = [[b[0] * img.width, b[1] * img.height, b[2] * img.width, b[3] * img.height]]
+
+        model = SAM("mobile_sam.pt")
+        # Run inference using box prompt or point prompt
+        if bboxes:
+            results = model.predict(img, bboxes=bboxes, verbose=False)
+        elif multi_points_scaled:
+            # labels=[1]*len ensures all points are positive prompts
+            results = model.predict(img, points=multi_points_scaled, labels=[1]*len(multi_points_scaled), verbose=False)
+        else:
+            results = model.predict(img, points=[point], labels=[1], verbose=False)
+        
+        # Extract mask
+        mask = np.zeros((img.height, img.width), dtype=np.uint8)
+        conf = 0.9
+        if results and len(results) > 0 and results[0].masks is not None:
+            # Take the first mask
+            m = results[0].masks.data[0].cpu().numpy()
+            # SAM masks might be resized, resize back to original image size if needed
+            from PIL import Image as PILImage
+            m_img = PILImage.fromarray((m * 255).astype(np.uint8)).resize((img.width, img.height), resample=PILImage.NEAREST)
+            mask = np.array(m_img)
+            
+            if hasattr(results[0], "boxes") and results[0].boxes is not None and len(results[0].boxes.conf) > 0:
+                conf = float(results[0].boxes.conf[0].cpu().numpy())
+
+        mask_b64 = _encode_mask_png(mask)
+        caption = "segmented region"
+        
+        ys, xs = np.where(mask > 0)
+        if len(ys) > 0 and len(xs) > 0:
+            x_min, x_max = int(np.min(xs)), int(np.max(xs))
+            y_min, y_max = int(np.min(ys)), int(np.max(ys))
+            # Add small padding
+            pad = 10
+            x_min, y_min = max(0, x_min - pad), max(0, y_min - pad)
+            x_max, y_max = min(img.width, x_max + pad), min(img.height, y_max + pad)
+            
+            cropped = img.crop((x_min, y_min, x_max, y_max))
+            buf = io.BytesIO()
+            cropped.save(buf, format="PNG")
+            cropped_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+            
+            try:
+                caption_resp, _ = await call_model_with_schema([
+                    {"role": "user", "content": [
+                        {"type": "text", "text": "Caption the central object or region in this image crop in one brief phrase (e.g., 'a dense tree canopy', 'a large commercial building', 'a river segment')."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{cropped_b64}"}}
+                    ]}
+                ], AnswerResponse, max_tokens=30, temperature=0.0)
+                caption = caption_resp.answer
+            except Exception:
+                pass
+
+        return {"mask": mask_b64, "internal_reasoning": reasoning, "confidence": conf, "caption": caption}
     except Exception as exc:
         raise RuntimeError(f"Segmentation failed: {exc}") from exc

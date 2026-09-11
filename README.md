@@ -1,152 +1,191 @@
-# SatQuery — Earth Observation Intelligence Platform
+# SatQuery — Comprehensive Technical Documentation & Architecture
 
-**SatQuery** is an interactive, low-latency agentic web application designed for multi-modal Earth Observation (EO) satellite image analysis. Built to meet the requirements of public benchmark test splits and the **ISRO / SAC Evaluation Standard**, SatQuery enables users to seamlessly upload EO imagery (single optical/multispectral, bi-temporal pairs, or co-registered optical–SAR pairs), draw interactive regions of interest, and run a **Multi-Agent AI System** for Visual Question Answering (VQA), Temporal Change Analysis, Optical-SAR Joint Fusion, and Interactive Segmentation.
-
----
-
-## 📌 Executive Summary of Progress
-
-The SatQuery platform has evolved from initial UI prototyping into a fully functional, containerized **Agentic Earth Observation System**. All key system capabilities—including front-end geospatial canvas interactions, FastAPI backend routing, PostGIS spatial persistence, and the **LangGraph Multi-Agent Model Server**—are fully built and integrated.
-
-### Key Milestones Achieved:
-- **Phase 1 & 2 (UI & Infrastructure)**: Integrated Next.js 14 IDE-style workspace with resizable panels, real-time bounding box drawing, rasterio-driven lat/lon calculations, and Server-Sent Events (SSE) streaming.
-- **Phase 3 (Multi-Agent Orchestration)**: Implemented a production-grade **LangGraph orchestrator** with intelligent routing powered by LLM decision-making (`Qwen2.5-72B-Instruct`) and fallback heuristic nodes.
-- **Task-Specific Tool Engines**: Implemented standardized tools for **VQA**, **Change Detection**, **Optical-SAR Fusion**, and **Click Segmentation**.
-- **ISRO/SAC & Public Benchmark Alignment**: Designed data pipelines and evaluation structures for co-registered **Cartosat-2S Optical** & **RISAT SAR** pairs, bi-temporal pairs, and standard benchmarks (BigEarthNet, RSVQA, GeoChat).
-- **Dependency & Build Harmonization**: Resolved complex Pydantic v2 / FastAPI / LangChain version constraints, enabling automated multi-container Docker deployments.
+Welcome to the definitive technical reference for **SatQuery**, an interactive, low-latency agentic web application designed for multi-modal Earth Observation (EO) satellite image analysis. This document serves as an exhaustive guide to the platform's architecture, tools, technologies, and the intricate agentic systems powering its intelligence.
 
 ---
 
-## 🏗️ System Architecture
+## 1. Executive Summary & Vision
 
-SatQuery follows a microservices architecture across 4 isolated Docker containers to guarantee operational separation, horizontal scalability, and developer parallelization.
+SatQuery bridges the gap between raw satellite imagery and actionable geospatial intelligence. By leveraging a modern React-based frontend and a high-performance Python/FastAPI backend, users can upload EO imagery (Optical, SAR, Multispectral, Thermal) and interact with an AI assistant (GeoChat) to analyze the data.
 
+At the heart of SatQuery is a **Multi-Agent Orchestration System** powered by LangGraph and state-of-the-art Vision-Language Models (VLMs) hosted via Cloudflare Workers AI. This system dynamically routes natural language queries to specialized computer vision tools—ranging from Visual Question Answering (VQA) to zero-shot pixel-perfect segmentation using MobileSAM.
+
+---
+
+## 2. Frontend Architecture (React, Vite, TSX)
+
+The frontend is a Single Page Application (SPA) built for extreme interactivity and real-time feedback.
+
+### 2.1 Core Technologies
+- **Framework**: React 18, utilizing functional components and hooks.
+- **Build Tool**: Vite for lightning-fast HMR and optimized production bundling.
+- **Language**: TypeScript (TSX) for strict type safety across components and API payloads.
+- **Styling**: Pure vanilla CSS utilizing modern glassmorphism (translucent backgrounds with blur), sleek dark-mode aesthetics, and responsive CSS Grid/Flexbox layouts. No bulky CSS frameworks are used, ensuring maximum performance and customizability.
+
+### 2.2 Component Structure & Workspace
+- **WorkspacePage (`WorkspacePage.tsx`)**: The central hub of the application. It manages a three-panel layout:
+  - **Left Panel (Metadata)**: Displays detected image modalities, spectral channels, observation summaries, and active regions.
+  - **Center Panel (Interactive Canvas)**: Renders the satellite image with dynamic zooming, panning, and layer filtering. 
+  - **Right Panel (GeoChat UI)**: The conversational interface where users interact with the agent.
+- **Interactive Canvas & Click-to-Segment**: 
+  The center image wrapper captures `onClick` events, mathematically translating the user's browser viewport click into exact normalized image coordinates `[x, y]`. A glowing blue crosshair/dot is rendered at this coordinate, and the `clickPoint` state is updated to be dispatched to the backend upon the next user query.
+- **Mask Overlays**: 
+  When the backend successfully segments an object, it returns a transparent Base64 PNG. The frontend extracts this and dynamically renders it as an absolutely positioned `<img>` overlay (`.workspace-mask-overlay`) exactly on top of the original satellite image, maintaining perfect aspect ratio alignment regardless of zoom level.
+
+### 2.3 GeoChat Conversational UI
+- **State Management**: Chat messages are maintained in a React state array. Each `Message` interface tracks the sender, text, timestamp, generated `segment_mask`, and structured `evidence`.
+- **Evidence Rendering**: To combat AI hallucination, the GeoChat UI features a dedicated `.geochat-evidence-container`. When the backend returns verifiable claims, the UI maps over the `evidence` array and renders each claim explicitly below the AI's response, complete with confidence scores.
+
+---
+
+## 3. Backend Architecture (FastAPI, Uvicorn)
+
+The backend acts as the secure, high-throughput gateway between the frontend client and the AI orchestration layer.
+
+### 3.1 Core Technologies
+- **Framework**: FastAPI (Python 3.9+) for highly concurrent, async RESTful endpoints.
+- **Server**: Uvicorn ASGI server.
+- **Validation**: Pydantic v2 for rigorous schema validation of all incoming and outgoing API payloads.
+
+### 3.2 API Endpoints & Routing
+- `POST /api/v1/upload`: 
+  Handles multipart form data for image uploads. It decodes the files, performs heuristic checks on file extensions and headers, and provisions a unique session ID.
+- `POST /agent`: 
+  The primary query endpoint. It accepts an `AgentQueryOptions` JSON payload (containing the user's question, Base64 image data, chat history, and optional `click_point`). It instantiates the LangGraph initial state and asynchronously invokes the multi-agent graph.
+- `GET /health`: 
+  A standard liveness probe for Docker container orchestration and load balancer checks.
+
+### 3.3 Data Processing
+Images are transmitted between the frontend and backend using Base64 encoding. The backend handles decoding these strings into in-memory byte buffers (`io.BytesIO`) which are then natively processed by PIL (Pillow) and NumPy for computer vision tasks, entirely bypassing slow disk I/O.
+
+---
+
+## 4. Database & Authentication (Supabase)
+
+SatQuery relies on Supabase (an open-source Firebase alternative) for its persistent storage and identity management.
+
+### 4.1 Authentication
+- Integrates Supabase Auth for seamless user sign-ups, logins, and JWT token management.
+- The React frontend uses the `AuthContext` to track session state. Upon successful login, the session is securely cached in local storage.
+- All subsequent HTTP requests to protected FastAPI endpoints include the Supabase JWT in the `Authorization: Bearer` header.
+
+### 4.2 Data Flow & Relational Database (PostgreSQL)
+The application handles complex user-scoped data using PostgreSQL. The flow is as follows:
+1. **User Table Sync**: When a user registers via Supabase Auth, a PostgreSQL trigger automatically provisions a corresponding row in the `public.users` table, setting up their profile metadata and API quotas.
+2. **Analysis Metadata (`analyses` table)**: 
+   - When a user uploads an image via the frontend `WorkspacePage`, it is sent to the FastAPI backend.
+   - The backend validates the image and inserts a new row into the `analyses` table, containing the image metadata (dimensions, modality, file size).
+   - The primary key (`id`) of this row acts as the `session_id` for the analysis.
+3. **Chat History (`chat_messages` table)**:
+   - As the user chats with the AI, the frontend sends queries to the `/agent` endpoint.
+   - Upon receiving the AI's response, the backend serializes the interaction and inserts it into the `chat_messages` table with a foreign key linking back to the `analyses` table.
+   - This ensures full persistence. When the user visits the History page, the frontend fetches these rows so the user can resume precisely where they left off.
+4. **Row Level Security (RLS)**:
+   - Supabase RLS policies are strictly enforced on all tables. 
+   - Each SQL query automatically filters rows where `auth.uid() = user_id`, guaranteeing that users can only ever access their own uploaded images and chat histories.
+
+### 4.3 Object Storage & Media Flow
+- **Raw Imagery**: When images are uploaded, the FastAPI backend streams them directly into a secure Supabase Storage bucket (`satquery-imagery`). Only the secure CDN URL is stored in the PostgreSQL database.
+- **Segmentation Masks**: When the MobileSAM agent generates a Base64 segmentation mask, the backend uploads it to a `satquery-masks` bucket. This prevents the PostgreSQL database from bloating with heavy Base64 strings, maintaining lightning-fast query times.
+- Both buckets are protected by RLS, ensuring private images remain completely isolated per user account.
+
+---
+
+## 5. Agentic AI System & LangGraph Orchestration
+
+The crown jewel of SatQuery is its autonomous, multi-agent reasoning engine located in `model-server/app/agent/`. It utilizes LangGraph to create a robust StateGraph that manages context, tools, and LLM inferences.
+
+### 5.1 The State Object (`GraphState`)
+LangGraph operates on a shared state passed between nodes. Our `GraphState` (defined via Pydantic) contains:
+- `messages`: A chronological log of human and AI messages.
+- `mode`: The current operational mode (e.g., `router`, `vqa`, `segmentation`).
+- `image` & `click_point`: The visual context.
+- `evidence`: A structured list of verifiable facts.
+- `segment_mask`: Base64 PNG output from the segmentation engine.
+- `missing_inputs`: Flags tracking if the user requested an action but forgot to supply necessary inputs (e.g., asking for change detection with only one image).
+
+### 5.2 Cloudflare Workers AI Integration
+We utilize Cloudflare Workers AI for edge-optimized inference, drastically reducing latency.
+- **Model**: `Qwen/Qwen2.5-VL` (a highly capable Vision-Language Model).
+- **Client**: `cloudflare_client.py` wraps the standard HTTP requests to Cloudflare's `/run` endpoint, handling retries, timeout management, and JSON schema parsing for structured generation.
+
+### 5.3 The Conversational Router Node
+This node acts as the "Brain" of the system. 
+- **Prompt Engineering**: The router is injected with a powerful system prompt that explains its role as an EO orchestrator. It is given access to the user's query, the chat history, and a heuristic classifier's recommendation.
+- **Routing Logic**: The router evaluates if the user's query is conversational ("hello") or analytical ("segment the river"). It explicitly prioritizes the classifier's suggested tool, mitigating infinite loops. If inputs are missing (e.g., change detection requested but no second image provided), the router intelligently aborts the tool call and routes to the conversational fallback to ask the user for the missing data.
+
+### 5.4 Specialized Tool Nodes
+
+#### A. Visual Question Answering (`vqa_tool`)
+- **Execution**: Sends the user's query and the image to Qwen2.5-VL. 
+- **Output**: Generates a detailed textual analysis of the scene (e.g., identifying land cover, estimating crop health, or detecting infrastructure).
+
+#### B. Segmentation Engine (`segmentation_tool`)
+The segmentation engine utilizes Ultralytics' **MobileSAM** (Segment Anything Model) for zero-shot object masking. It is highly optimized to prevent hallucination through a dual-input strategy:
+- **Explicit Click Points**: If the user clicks the image, the exact `[x, y]` coordinate is received. The engine scales this coordinate to the image's dimensions and passes it as a precise prompt to MobileSAM.
+- **Natural Language Localization**: If the user types "segment the river" without clicking, the VLM is invoked to localize the river. The VLM returns a bounding box and a central `point_x, point_y`.
+- **Anti-Hallucination Fallback**: Previous iterations passed massive bounding boxes to SAM, causing it to segment the entire background. The current architecture strictly enforces **point-based prompting**. If the VLM only provides a bounding box, the backend calculates the exact mathematical center (`cx, cy`) of that box and feeds *only that single coordinate* to SAM. This guarantees that SAM focuses on the specific object rather than the bounding box's background noise.
+- **Post-Processing**: The generated binary mask array is colorized (RGBA Emerald-400), converted to a transparent PNG, and returned as a Base64 string to the frontend. A cropped image of the segmented object is also captioned by the VLM for further context.
+
+#### C. Fusion & Change Analysis Tools
+- **Change Detection**: Analyzes bi-temporal image pairs (Before/After) to calculate percentage changes in land cover or disaster impact (e.g., flood extent).
+- **SAR-Optical Fusion**: Cross-references optical imagery with Synthetic Aperture Radar (SAR) data to penetrate cloud cover and verify ground features.
+
+### 5.5 The Conversational Aggregator Node
+After a specialized tool finishes its execution, the raw outputs (confidence scores, raw masks, tool names) are passed to the `conversational_aggregator_node`. This node uses the VLM to synthesize the technical outputs into a friendly, conversational response tailored to the user, ensuring the final output is both scientifically accurate and highly readable.
+
+---
+
+## 6. Evidence-Based Anti-Hallucination Framework
+
+To maintain scientific integrity, SatQuery implements a rigorous evidence pipeline to prevent LLM hallucinations.
+1. **Prompt Constraint**: During `vqa` or aggregation, the VLM is instructed to populate a strict JSON schema array named `evidence`.
+2. **Schema Definition**: Each evidence item requires a `claim_id`, a `source_type` (observation vs. interpretation), and a `text` field containing the explicit claim (e.g., "River meandering through agricultural fields").
+3. **Frontend Parsing**: The React frontend maps over this JSON array. Instead of dumping raw JSON strings to the user, it cleanly parses the `text` field and renders it under an "Evidence Found" UI badge. This forces the AI to "show its work," ensuring every claim can be traced back to a specific visual observation.
+
+---
+
+## 7. Setup, Development & Deployment
+
+### 7.1 Environment Variables
+Create a `.env` file in the `model-server` directory with the following critical keys:
+```env
+CLOUDFLARE_API_TOKEN=your_cloudflare_token
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          SatQuery Workspace UI                          │
-│                   Next.js 14 + Canvas + Mapbox HUD                      │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │
-                           HTTP / SSE Streaming
-                                     │
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        Backend API Service (FastAPI)                    │
-│          • Image upload & Rasterio spatial metadata extraction          │
-│          • Query orchestration & Session management                     │
-└──────────────────┬──────────────────────────────────┬───────────────────┘
-                   │                                  │
-          SQLAlchemy / PostGIS                        │ REST / JSON
-                   │                                  ▼
-┌──────────────────▼───────────┐    ┌────────────────────────────────────┐
-│      PostgreSQL + PostGIS    │    │      Model Server Container        │
-│  • Bounding box geometries   │    │  (FastAPI + LangGraph Multi-Agent) │
-│  • Image metadata storage    │    │  ┌──────────────────────────────┐  │
-│  • Spatial index queries     │    │  │ LangGraph Router Node        │  │
-└──────────────────────────────┘    │  └──────────────┬───────────────┘  │
-                                    │                 │                      │
-                                    │  ┌──────────────▼───────────────┐  │
-                                    │  │ LangGraph Executor & Tools   │  │
-                                    │  │ • VQA Engine                 │  │
-                                    │  │ • Change Analysis Engine     │  │
-                                    │  │ • Optical-SAR Fusion Engine  │  │
-                                    │  │ • Click-Segmentation Engine  │  │
-                                    │  └──────────────────────────────┘  │
-                                    └────────────────────────────────────┘
-```
 
----
-
-## 🤖 Multi-Agent System (LangGraph Architecture)
-
-The core intelligence layer lives inside `model-server/app/agent/` and is orchestrated using **LangGraph**.
-
-### 1. Router Node (`graph.py`)
-- **LLM Decision Engine**: Evaluates the user query, conversation history, and uploaded image metadata (single image, before/after pair, optical+SAR, or click point).
-- **Model**: Invokes `Qwen/Qwen2.5-72B-Instruct` via HuggingFace Inference API to select the optimal analysis tool and return structured JSON decisions.
-- **Rule-Based Fallback Engine**: If cloud API network conditions fluctuate, the router gracefully falls back to deterministic context evaluation (e.g., automatically routing temporal pairs to `change_detection` and optical-SAR pairs to `fusion`).
-
-### 2. Specialized Tool Suite (`tools.py`)
-| Tool Name | Engine Function | Target Inputs | Outputs |
-| :--- | :--- | :--- | :--- |
-| **`vqa_tool`** | Single-image Visual Question Answering & object detection | Single Optical / SAR image | Natural language answer, bounding boxes, impact metrics |
-| **`change_analysis_tool`** | Bi-temporal change detection & extent calculation | Before / After GeoTIFF pair | Change summary, change ratio (%), highlight bounding boxes |
-| **`fusion_analysis_tool`** | Optical-SAR joint cross-verification & radar analysis | Co-registered Optical + SAR pair | Multi-modal confirmation text, agreement score (%) |
-| **`segmentation_tool`** | Point-guided boundary segmentation | Image + [x, y] coordinates | Segmentation mask polygon overlays |
-
----
-
-## 🚀 Key Features Implemented
-
-### 1. Interactive Geospatial Workspace (Frontend)
-- **Multi-Modal Auto-Detection**: Uploading image pairs automatically detects whether they represent a **Temporal Pair** (revealing the side-by-side comparison slider) or a **Fusion Pair** (revealing Optical vs SAR toggles).
-- **Live Lat/Lon HUD**: Hovering over the map or drawing bounding boxes calculates real-world geographic coordinates derived from GeoTIFF raster transformation matrices (`rasterio`).
-- **Dynamic Region Switching**: Users can draw multiple Regions of Interest (ROIs), hot-swap between them in the sidebar, and target queries specifically to an ROI.
-
-### 2. Streaming Thought Traces & Bounding Box Evidence
-- **Real-Time SSE Pipeline**: The UI streams agent reasoning traces, model execution status, and text tokens live without full page refreshes.
-- **Visual Evidence Overlays**: Detected objects (e.g., flooded buildings, infrastructure, vessels) are returned with bounding box coordinates and rendered dynamically as glowing vector overlays on the image canvas.
-- **Impact Statistics**: Automated calculation of affected population and structural impact figures for disaster evaluation queries.
-
-### 3. ISRO/SAC Benchmark & Dataset Support
-- Designed to support prescribed benchmark test splits (e.g., BigEarthNet, RSVQA, GeoChat).
-- Built-in schema for **ISRO/SAC evaluation datasets** containing pre-georeferenced, co-registered **Cartosat-2S Optical** and **RISAT SAR** image pairs.
-
----
-
-## 🛠️ API Reference & Endpoint Map
-
-### Backend Service (`http://localhost:8000`)
-- `POST /api/v1/upload`: Processes GeoTIFF upload, extracts CRS/transform metadata, saves to disk & PostGIS.
-- `POST /api/v1/query`: Accepts user query, image ID(s), and region context. Streams agent execution responses via Server-Sent Events (SSE).
-- `GET /api/v1/images/{id}`: Retrieves image details and PostGIS spatial geometry.
-
-### Model Server (`http://localhost:8001`)
-- `POST /agent/query`: Primary endpoint invoked by Backend; triggers the **LangGraph orchestrator**.
-- `POST /vqa/predict`: Direct single-image VQA model execution.
-- `POST /change/predict`: Direct bi-temporal change detection execution.
-- `POST /fusion/predict`: Direct optical-SAR joint fusion inference.
-- `POST /segment/predict`: Direct click-guided segmentation inference.
-
----
-
-## ⚖️ Evaluation & Judging Criteria Matrix
-
-| Criterion | Evaluation Metric | Supported Data / Benchmark | Status |
-| :--- | :--- | :--- | :--- |
-| **VQA Accuracy** | Open-ended BLEU/ROUGE & classification accuracy | RSVQA, GeoChat test split | Fully Supported |
-| **Change Extent Precision** | IoU / F1-Score on change masks | Bi-temporal GeoTIFF pairs | Fully Supported |
-| **Optical-SAR Agreement** | Cross-modal feature alignment score | Cartosat-2S + RISAT SAR | Fully Supported |
-| **System Latency** | SSE initial token response time (<2s target) | Asynchronous FastAPI + Docker | Optimized |
-
----
-
-## 🌐 Infrastructure & Deployment Notes
-
-### Hugging Face API Integration & Local Fallback
-During deployment probing, the system was configured to interact with Hugging Face's serverless endpoints:
-- **Router Model**: `Qwen/Qwen2.5-72B-Instruct` is utilized via the Serverless Router endpoint (`router.huggingface.co`) for natural language agent orchestration.
-- **Vision Models**: Model server tools feature built-in fallback routines to local PyTorch pipelines or structured heuristic responses if cloud vision APIs experience rate-limits or DNS constraints.
-
-### Multi-Container Quickstart
-
-Ensure Docker Desktop is installed and running, then start all 4 services:
-
+### 7.2 Running Locally (Native)
+**Backend**:
 ```bash
-# Build and bring up all microservices
-docker compose up --build -d
+cd model-server
+pip install -r requirements.txt
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-#### Service URLs:
-- **Frontend Workspace**: `http://localhost:3000`
-- **Backend API Documentation**: `http://localhost:8000/docs`
-- **Model Server API Documentation**: `http://localhost:8001/docs`
+**Frontend**:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 7.3 Docker Deployment
+SatQuery is fully containerized for production deployment across 4 isolated microservices.
+```bash
+# Build and start all containers in detached mode
+docker compose up --build -d
+
+# View live AI reasoning logs
+docker compose logs -f model-server
+
+# Gracefully shut down
+docker compose down
+```
 
 ---
 
-## 📅 Roadmap & Next Steps
+## 8. Future Roadmap
 
-1. **Local VLM Model Weight Fine-Tuning**: Integrate local Qwen2-VL or GeoChat PyTorch model weights directly into `model-server` GPU VRAM for offline hackathon judging.
-2. **PostGIS Session Memory**: Persist multi-turn conversation threads into database tables (`chat_sessions`) for historical context retrieval.
-
-# SatQuery_Agent
+1. **Local VLM Model Weight Fine-Tuning**: Integration of localized Qwen2-VL PyTorch model weights directly into GPU VRAM for entirely offline, air-gapped environments.
+2. **Advanced Multi-Point SAM Prompts**: Expanding the localization pipeline to generate multiple positive and negative point prompts for complex, disjointed structures (e.g., archipelagos).
+3. **Vector Database Integration**: Embedding chat histories and extracted evidence into Pinecone/Milvus for semantic RAG (Retrieval-Augmented Generation) across past sessions.

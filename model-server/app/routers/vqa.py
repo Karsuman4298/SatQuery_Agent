@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 VQA endpoint — Visual Question Answering on satellite image crops.
 Wraps GeoChat model (or returns mock data when MOCK_MODELS=true).

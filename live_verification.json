@@ -1,0 +1,400 @@
+{
+  "VQA": [
+    {
+      "stage": "input_validation",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "agent_graph",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "sensor_metadata",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "image_quality",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "error_responder",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {
+        "answer": "Unable to analyze the input: Image is empty, non-finite, or contains no non-zero pixels",
+        "evidence": [],
+        "errors": [],
+        "change_mask": null,
+        "change_pct": null,
+        "agreement_pct": null,
+        "segment_mask": null
+      }
+    },
+    {
+      "stage": "persist_db",
+      "status": "complete",
+      "data": {
+        "query_id": "82a95bf7-dee2-44bb-9573-1456877b2ea0",
+        "confidence": 0.0
+      }
+    }
+  ],
+  "Segmentation": [
+    {
+      "stage": "input_validation",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "agent_graph",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "sensor_metadata",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "image_quality",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "error_responder",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {
+        "answer": "Unable to analyze the input: ",
+        "evidence": [],
+        "errors": [],
+        "change_mask": null,
+        "change_pct": null,
+        "agreement_pct": null,
+        "segment_mask": null
+      }
+    },
+    {
+      "stage": "persist_db",
+      "status": "complete",
+      "data": {
+        "query_id": "a63d966d-b404-4ace-8153-0018cbf6b3b0",
+        "confidence": 0.0
+      }
+    }
+  ],
+  "Change Detection": [
+    {
+      "stage": "input_validation",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "agent_graph",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "sensor_metadata",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "image_quality",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "scene_observation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "change_detection_agent",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_validator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_validator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_judge",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_judge",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "uncertainty_checker",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "uncertainty_checker",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {
+        "answer": "The image appears to be the same in both the BEFORE and AFTER satellite images. There are no visible changes or differences between the two images.\n\n**Change Extent:** 100.0% of the scene area shows pixel-level difference.",
+        "evidence": [
+          {
+            "claim_id": "change-summary",
+            "source_type": "interpretation",
+            "text": "The image appears to be the same in both the BEFORE and AFTER satellite images. There are no visible changes or differences between the two images.",
+            "region": null,
+            "tool_ref": null,
+            "confidence": 0.0
+          }
+        ],
+        "errors": [],
+        "change_mask": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAAAAAB5Gfe6AAAB/ElEQVR4nO3QQREAIAzAMIZ/zyAjjzUKep13drs6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugArQE6QGuADtAaoAO0BugA7QMdHwL/Kv1qDQAAAABJRU5ErkJggg==",
+        "change_pct": 100.0,
+        "agreement_pct": null,
+        "segment_mask": null
+      }
+    },
+    {
+      "stage": "persist_db",
+      "status": "complete",
+      "data": {
+        "query_id": "671511e3-891d-4cc6-892a-181f4b22e1e1",
+        "confidence": 0.469
+      }
+    }
+  ],
+  "Fusion": [
+    {
+      "stage": "input_validation",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "agent_graph",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "sensor_metadata",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "image_quality",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "scene_observation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "fusion_agent",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_validator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_validator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_judge",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "evidence_judge",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "uncertainty_checker",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "uncertainty_checker",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {
+        "answer": "The optical image is completely black, indicating no visible features or structures. The SAR image shows a landscape with some features, but the lack of visible features in the optical image makes it impossible to compare or fuse the two images.\n\n**Computed agreement indicator:** 100.0%",
+        "evidence": [
+          {
+            "claim_id": "fusion-summary",
+            "source_type": "interpretation",
+            "text": "The optical image is completely black, indicating no visible features or structures. The SAR image shows a landscape with some features, but the lack of visible features in the optical image makes it impossible to compare or fuse the two images.",
+            "region": null,
+            "tool_ref": null,
+            "confidence": 0.0
+          }
+        ],
+        "errors": [],
+        "change_mask": null,
+        "change_pct": null,
+        "agreement_pct": 100.0,
+        "segment_mask": null
+      }
+    },
+    {
+      "stage": "persist_db",
+      "status": "complete",
+      "data": {
+        "query_id": "ad08a029-f773-4a35-a546-88f537c28625",
+        "confidence": 0.469
+      }
+    }
+  ],
+  "Conversational": [
+    {
+      "stage": "input_validation",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "agent_graph",
+      "status": "running",
+      "data": {}
+    },
+    {
+      "stage": "input_validation",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "conversational_agent",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {}
+    },
+    {
+      "stage": "report_generator",
+      "status": "complete",
+      "data": {
+        "answer": "Observed features:\n- No validated observations were returned.\n\nMetadata: Technical metadata unavailable.\n\nUncertainty: Exact location, acquisition date, and unsupported measurements are not inferred from the image.",
+        "evidence": [],
+        "errors": [],
+        "change_mask": null,
+        "change_pct": null,
+        "agreement_pct": null,
+        "segment_mask": null
+      }
+    },
+    {
+      "stage": "persist_db",
+      "status": "complete",
+      "data": {
+        "query_id": "9841ee76-1464-457f-8bbb-b6d03abc0ca3",
+        "confidence": 0.0
+      }
+    }
+  ]
+}

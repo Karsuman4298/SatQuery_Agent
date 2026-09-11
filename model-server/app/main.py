@@ -8,11 +8,10 @@ Set MOCK_MODELS=false for live OpenRouter analysis.
 """
 
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import vqa, change, fusion, segment
+from app.routers import vqa, change, fusion, segment, debug
 from app.routers import agent as agent_router
 
 
@@ -36,12 +35,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Allow CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust as necessary for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Register routers
 app.include_router(vqa.router, tags=["vqa"])
 app.include_router(change.router, tags=["change"])
 app.include_router(fusion.router, tags=["fusion"])
 app.include_router(segment.router, tags=["segment"])
 app.include_router(agent_router.router, tags=["agent"])
+app.include_router(debug.router, tags=["debug"])
 
 
 @app.get("/health")
