@@ -6,14 +6,18 @@ POST /agent  →  runs the full router → executor pipeline.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID, uuid4
+import asyncio
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from langchain_core.messages import AIMessage, HumanMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.agent.pipeline import new_state
 from app.agent.production_graph import production_graph
 from app.agent.state import GraphState
+
+from app.runtime.api import owner as runtime_owner
 
 router = APIRouter()
 
@@ -21,14 +25,17 @@ router = APIRouter()
 class AgentRequest(BaseModel):
     """Incoming request payload for the agent endpoint."""
     mode: str = "vqa"
-    question: str
+    question: str = Field(min_length=1, max_length=2000)
+    asset_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=2)
+    thread_id: UUID | None = None
+    alignment_confirmed: bool = False
     image: str = ""           # base64 primary image
     before: str = ""          # base64 before image (temporal)
     after: str = ""           # base64 after image (temporal)
     optical: str = ""         # base64 optical image (fusion)
     sar: str = ""             # base64 SAR image (fusion)
     region_name: str = ""
-    click_point: list[int] | None = None
+    click_point: tuple[int, int] | None = None
     chat_history: list[dict] = []   # [{"role": "user"|"assistant", "content": "..."}]
     metadata: dict[str, Any] = {}
 
@@ -50,13 +57,35 @@ class AgentResponse(BaseModel):
 
 @router.post("/agent", response_model=AgentResponse)
 @router.post("/agent/query", response_model=AgentResponse, include_in_schema=True)
-async def run_agent(request: AgentRequest) -> AgentResponse:
+async def run_agent(request: AgentRequest, owner_scope: str = Depends(runtime_owner)) -> AgentResponse:
     """
     Run the full agentic pipeline:
     1. Router decides which tool best fits the query.
     2. Executor invokes the tool with the image context.
     3. Returns formatted answer + raw tool outputs.
     """
+    if request.asset_ids:
+        from app.runtime.api import query as run_reference_query, runtime
+        from app.runtime.contracts import Query
+        import base64
+        task = {"segmentation": "grounding", "change_detection": "change", "fusion": "fusion"}.get(request.mode, "auto")
+        result = await run_reference_query(Query(query=request.question, asset_ids=request.asset_ids,
+            thread_id=request.thread_id or uuid4(), task=task, alignment_confirmed=request.alignment_confirmed,
+            click_point=request.click_point), owner_scope)
+        mask = next((item for item in result.evidence if item.mask_uri), None)
+        mask_data = None
+        if mask:
+            from starlette.concurrency import run_in_threadpool
+            mask_data = "data:image/png;base64," + base64.b64encode(await run_in_threadpool(runtime().objects.get, mask.mask_uri)).decode()
+        return AgentResponse(answer=result.answer, tool_used=result.plan.tool, confidence=result.confidence or 0.,
+            segment_mask=mask_data, inferred_task=result.plan.task,
+            execution_summary={"execution_id": str(result.execution_id), "thread_id": str(result.thread_id),
+                "plan": result.plan.model_dump(mode="json"), "warnings": result.warnings,
+                "status": result.status, "confidence_available": result.confidence is not None},
+            evidence=[item.model_dump(mode="json") for item in result.evidence],
+            errors=[{"error": issue, "recovered": False} for issue in result.conflicts],
+            stages=[item.model_dump(mode="json") for item in result.trace])
+
     # Reconstruct LangChain message history
     messages = []
     for msg in request.chat_history:
@@ -90,7 +119,7 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
     image_context["chat_history"] = request.chat_history
     initial_state = new_state(request.question, image_context, request.mode)
     try:
-        final_state = GraphState.model_validate(await production_graph.ainvoke(initial_state))
+        final_state = GraphState.model_validate(await asyncio.wait_for(production_graph.ainvoke(initial_state), timeout=170))
     except Exception as exc:
         return AgentResponse(
             answer=f"Analysis unavailable: {exc}",
@@ -114,6 +143,7 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
             "inferred_task": final_state.inferred_task or tool_used,
             "classifier_confidence": final_state.classifier_confidence,
             "task_routing_reason": final_state.task_routing_reason,
+            "tool_parameters": {"mode": request.mode, "click_point": request.click_point},
             "classifier_scores": final_state.classifier_scores,
             "needs_clarification": final_state.needs_clarification,
             "model_used": final_state.model_used,
@@ -127,6 +157,8 @@ async def run_agent(request: AgentRequest) -> AgentResponse:
     )
 
     from app.routers.debug import _DEBUG_TRACES
+    if len(_DEBUG_TRACES) >= 100:
+        _DEBUG_TRACES.pop(next(iter(_DEBUG_TRACES)))
     _DEBUG_TRACES[initial_state.query_id] = final_state.trace
 
     if tool_used == "change_detection":

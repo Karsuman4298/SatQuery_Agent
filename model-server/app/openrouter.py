@@ -205,19 +205,6 @@ async def call_model_with_schema(
     
     schema = response_model.model_json_schema()
     
-    # Inject internal_reasoning explicitly if it's a local model
-    if settings.model_backend == "ollama":
-        if "properties" not in schema:
-            schema["properties"] = {}
-        schema["properties"]["internal_reasoning"] = {
-            "type": "string",
-            "description": "Your internal step-by-step reasoning. MUST be provided."
-        }
-        if "required" not in schema:
-            schema["required"] = []
-        if "internal_reasoning" not in schema["required"]:
-            schema["required"].append("internal_reasoning")
-
     # Role-based client selection
     allowed_cf_roles = {"classifier_disambiguation", "conversational_agent", "region_followup_agent"}
     
@@ -225,7 +212,11 @@ async def call_model_with_schema(
     if settings.model_backend == "ollama":
         from app.model_clients.ollama_client import OllamaClient
         local_client = OllamaClient()
-        local_model_name = "ollama/qwen2.5-vl"
+        local_model_name = f"ollama/{settings.ollama_model}"
+    elif settings.model_backend == "vllm":
+        from app.model_clients.local_vllm_client import LocalVLLMClient
+        local_client = LocalVLLMClient(settings.vllm_base_url, settings.vllm_model)
+        local_model_name = f"vllm/{settings.vllm_model}"
     else:
         from app.model_clients.openrouter_client import OpenRouterClient
         local_client = OpenRouterClient()
@@ -235,7 +226,7 @@ async def call_model_with_schema(
     model_name = local_model_name
     
     # Override with Cloudflare if allowed and configured
-    if role in allowed_cf_roles and settings.cloudflare_account_id:
+    if settings.model_backend == "cloudflare" and role in allowed_cf_roles and settings.cloudflare_account_id:
         client = CloudflareClient()
         model_name = "cloudflare/llama-4-scout"
 

@@ -15,3 +15,11 @@ pytest-asyncio>=0.23.0
 torch>=2.2.0
 torchvision>=0.17.0
 ultralytics>=8.1.0
+
+# Asset-reference runtime and self-hosted storage adapters
+python-multipart>=0.0.18
+rasterio>=1.3.10
+sqlalchemy>=2.0.32,<3
+psycopg[binary]>=3.2,<4
+boto3>=1.35,<2
+celery[redis]>=5.4,<6

@@ -17,7 +17,7 @@ def _encode_mask_png(mask: np.ndarray) -> str:
     if mask.max() <= 1:
         mask = mask * 255
     rgba = np.zeros((mask.shape[0], mask.shape[1], 4), dtype=np.uint8)
-    rgba[mask > 0] = [52, 211, 153, 255] # Emerald-400
+    rgba[mask > 0] = [52, 211, 153, 145] # Emerald-400
     from PIL import Image as PILImage
     img = PILImage.fromarray(rgba, mode="RGBA")
     buf = io.BytesIO()
@@ -43,6 +43,7 @@ async def segmentation_tool(image: str, point: Optional[list] = None, region_des
         
     reasoning = None
     bboxes = None
+    user_point = point is not None
     if not point and region_description:
         loc_result = await localize_region(image, region_description)
         reasoning = loc_result.get("internal_reasoning")
@@ -73,7 +74,9 @@ async def segmentation_tool(image: str, point: Optional[list] = None, region_des
             from app.agent.exceptions import MalformedInputError
             raise MalformedInputError("Image payload is corrupted and cannot be read.")
             
-        if point and max(point) > 1.0 and max(point) <= 1000:
+        if user_point:
+            point = [min(img.width - 1, max(0, point[0] / 1000 * img.width)), min(img.height - 1, max(0, point[1] / 1000 * img.height))]
+        elif point and max(point) > 1.0 and max(point) <= 1000:
             point = [point[0] / 1000 * img.width, point[1] / 1000 * img.height]
         elif point and max(point) <= 1.0:
             point = [point[0] * img.width, point[1] * img.height]
@@ -92,7 +95,7 @@ async def segmentation_tool(image: str, point: Optional[list] = None, region_des
             results = model.predict(img, points=[point], labels=[1], verbose=False)
         
         mask = np.zeros((img.height, img.width), dtype=np.uint8)
-        conf = 0.9
+        conf = 0.0  # No calibrated score is available unless the model returns one.
         if results and len(results) > 0 and results[0].masks is not None:
             m = results[0].masks.data[0].cpu().numpy()
             from PIL import Image as PILImage

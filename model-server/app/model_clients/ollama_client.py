@@ -50,10 +50,10 @@ class OllamaClient(ModelClient):
         payload: dict[str, Any] = {
             "model": settings.ollama_model,
             "messages": ollama_messages,
-            "temperature": temperature,
             "stream": False,
             "options": {
                 "num_predict": max_tokens,
+                "temperature": temperature,
             }
         }
         

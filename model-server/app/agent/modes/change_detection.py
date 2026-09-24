@@ -40,7 +40,9 @@ async def change_analysis_tool(before: str, after: str, question: str = "Describ
         change_mask = (diff > threshold).astype(np.uint8)
         change_pct = float(change_mask.mean()) * 100
         
-        mask_img = Image.fromarray(change_mask * 255, mode="L")
+        rgba = np.zeros((256, 256, 4), dtype=np.uint8)
+        rgba[change_mask > 0] = [255, 185, 87, 150]
+        mask_img = Image.fromarray(rgba, mode="RGBA").resize(img_a.size, Image.Resampling.NEAREST)
         buf = io.BytesIO()
         mask_img.save(buf, format="PNG")
         mask_uri = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
@@ -54,9 +56,9 @@ async def change_analysis_tool(before: str, after: str, question: str = "Describ
             ]}
         ], ChangeSummaryResponse, max_tokens=200, temperature=0.0)
         
-        return {"summary": result.summary, "change_pct": change_pct, "change_mask": mask_uri, "evidence": [], "internal_reasoning": reasoning}
-    except Exception:
-        return {"summary": f"Change analysis unavailable for query: '{question}'", "change_pct": 0.0, "evidence": []}
+        return {"summary": result.summary, "change_pct": change_pct, "change_mask": mask_uri, "limitations": "Exploratory RGB difference at threshold 30/255 and 256px; includes illumination and registration effects. Not semantic land-cover change.", "evidence": [], "internal_reasoning": reasoning}
+    except Exception as exc:
+        raise RuntimeError("Change specialist unavailable; no change estimate was produced.") from exc
 
 
 async def change_node(state: GraphState) -> GraphState:

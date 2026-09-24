@@ -29,17 +29,10 @@ async def fusion_tool(optical: str, sar: str, question: str = "Assess feature ag
             from app.agent.exceptions import MalformedInputError
             raise MalformedInputError("Image payload is corrupted and cannot be read.")
             
-        import numpy as np
-        arr_o = np.array(img_o.resize((256, 256))).astype(np.float32)
-        arr_s = np.array(img_s.resize((256, 256))).astype(np.float32)
-        
-        arr_o = (arr_o - arr_o.min()) / (arr_o.max() - arr_o.min() + 1e-5)
-        arr_s = (arr_s - arr_s.min()) / (arr_s.max() - arr_s.min() + 1e-5)
-        
-        diff = np.abs(arr_o - arr_s)
-        agreement_mask = (diff < 0.3).astype(np.uint8)
-        agreement_pct = float(agreement_mask.mean()) * 100
-        
+        # Optical reflectance and radar backscatter have different physical meaning.
+        # Pixel brightness similarity cannot establish cross-sensor agreement.
+        agreement_pct = None
+
         result, reasoning = await call_model_with_schema([
             {"role": "system", "content": "Analyze these OPTICAL and SAR images. Return a short summary regarding structure/feature agreement."},
             {"role": "user", "content": [
@@ -52,8 +45,8 @@ async def fusion_tool(optical: str, sar: str, question: str = "Assess feature ag
         ], FusionResponse, max_tokens=200, temperature=0.0)
         
         return {"verification_result": result.analysis, "agreement_pct": agreement_pct, "evidence": [], "internal_reasoning": reasoning}
-    except Exception:
-        return {"verification_result": f"Analysis unavailable for query: '{question}'", "agreement_pct": 0.0, "evidence": []}
+    except Exception as exc:
+        raise RuntimeError("Optical–SAR specialist unavailable; no agreement estimate was produced.") from exc
 
 
 async def fusion_node(state: GraphState) -> GraphState:

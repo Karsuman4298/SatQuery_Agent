@@ -16,7 +16,6 @@ from app.agent.modes.change_detection import change_node
 from app.agent.modes.fusion import fusion_node
 from app.agent.modes.segmentation import segmentation_node
 from app.agent.modes.conversational import conversational_router_node, conversational_aggregator_node
-
 from app.agent.shared.evidence_validator import evidence_node, judge_claims
 from app.agent.shared.uncertainty_checker import uncertainty_node
 from app.agent.shared.report_generator import error_node

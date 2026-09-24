@@ -50,6 +50,8 @@ app.include_router(change.router, tags=["change"])
 app.include_router(fusion.router, tags=["fusion"])
 app.include_router(segment.router, tags=["segment"])
 app.include_router(agent_router.router, tags=["agent"])
+from app.runtime.api import router as runtime_router
+app.include_router(runtime_router)
 app.include_router(debug.router, tags=["debug"])
 
 
@@ -61,3 +63,29 @@ async def health_check():
         "service": "model-server",
         "mock_mode": settings.mock_models,
     }
+
+
+@app.get('/readiness')
+async def readiness():
+    """Distinguish a live API process from an available local inference model."""
+    import httpx
+    available = False
+    model = settings.ollama_model if settings.model_backend == 'ollama' else settings.vllm_model
+    try:
+        async with httpx.AsyncClient(timeout=3) as client:
+            if settings.model_backend == 'ollama':
+                response = await client.get(f'{settings.ollama_base_url.rstrip("/")}/api/tags')
+                response.raise_for_status()
+                available = any(item.get('name') == model or item.get('model') == model
+                                for item in response.json().get('models', []))
+            elif settings.model_backend == 'vllm':
+                response = await client.get(f'{settings.vllm_base_url.rstrip("/")}/v1/models')
+                response.raise_for_status()
+                available = any(item.get('id') == model for item in response.json().get('data', []))
+    except (httpx.HTTPError, ValueError):
+        pass
+    from app.agent.registry import REGISTRY
+    return {'status': 'ready' if available and not settings.mock_models else 'unavailable',
+            'provider': settings.model_backend, 'model': model, 'mock_mode': settings.mock_models,
+            'adaptation': 'Requires trained adapter and held-out benchmark evidence',
+            'capabilities': REGISTRY}

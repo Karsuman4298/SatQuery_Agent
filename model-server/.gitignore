@@ -1,0 +1,3 @@
+satquery-runtime.db*
+runtime-objects/
+finetune/checkpoints/

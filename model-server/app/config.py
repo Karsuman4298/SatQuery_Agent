@@ -22,8 +22,21 @@ class Settings(BaseSettings):
     
     # Local fallback/primary model configuration
     model_backend: str = "ollama"
+    vllm_base_url: str = "http://localhost:8002"
+    vllm_model: str = "satquery-rs"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5vl:7b"
+
+    # Reference runtime: local defaults, optional self-hosted production stores.
+    runtime_database_url: str = "sqlite:///./satquery-runtime.db"
+    runtime_object_dir: str = "./runtime-objects"
+    runtime_qdrant_url: str = ""
+    runtime_s3_endpoint: str = ""
+    runtime_s3_bucket: str = "satquery"
+    runtime_s3_access_key: str = ""
+    runtime_s3_secret_key: str = ""
+    runtime_gateway_key: str = ""
+    runtime_queue_url: str = ""
 
     # Cloudflare Workers AI configuration
     cloudflare_account_id: str = ""

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import base64
 import io
-
 import numpy as np
 from PIL import Image
-
 from app.tools.gis import blur_score, cloud_cover_percent
 
 

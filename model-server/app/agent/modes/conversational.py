@@ -60,14 +60,39 @@ async def conversational_router_node(state: GraphState) -> GraphState:
         state.errors.append({"node": "conversational_router", "error": str(exc), "recovered": True})
         state.mode = state.inferred_task if state.inferred_task in ["vqa", "segmentation", "change_detection", "fusion"] else "vqa"
         
+    # Hard constraints are applied after model-based routing, including its fallback.
+    from app.agent.registry import missing_inputs as required_inputs
+    # The selected pair configuration defines the available specialist workflow.
+    if state.image_context.get("before") and state.image_context.get("after"):
+        state.mode = "change_detection"
+    elif state.image_context.get("optical") and state.image_context.get("sar"):
+        state.mode = "fusion"
+    missing_required = required_inputs(state.mode, state.image_context)
+    if missing_required:
+        state.missing_inputs = missing_required
+        state.needs_clarification = True
+        state.mode = "conversational"
+    state.task_type = TaskType(kind=state.mode if state.mode != "conversational" else "vqa",
+                               requires_pair=state.mode in {"change_detection", "fusion"},
+                               requires_sar=state.mode == "fusion")
+    if not state.needs_clarification:
+        state.inferred_task = state.mode
+    state.task_routing_reason = f"Selected {state.mode}; input requirements checked against capability registry."
     return state
 
 async def conversational_aggregator_node(state: GraphState) -> GraphState:
     trace_node(state, "conversational_aggregator")
     history_str = json.dumps(state.image_context.get("chat_history", []))
     
+    if state.needs_clarification and state.missing_inputs:
+        state.final_answer = "This analysis requires: " + ", ".join(state.missing_inputs) + ". Upload the missing observations and retry."
+        return state
+
     tool_executed = state.mode
-    tool_output = json.dumps(state.tool_result) if state.tool_result else "No tool output generated."
+    # Keep image payloads and internal model text out of the synthesis prompt.
+    public_output = {key: value for key, value in state.tool_result.items()
+                     if key not in {"mask", "segment_mask", "change_mask", "internal_reasoning"}}
+    tool_output = json.dumps(public_output) if public_output else "No tool output generated."
     
     if state.needs_clarification and state.missing_inputs:
         tool_output = f"I need the user to upload: {', '.join(state.missing_inputs)}"
@@ -77,7 +102,9 @@ async def conversational_aggregator_node(state: GraphState) -> GraphState:
         "You have just executed a tool or analysis in the background. Your job is to present the results naturally to the user.\n"
         "If the tool returned an error or asked the user to 'click the region' (like in segmentation), gently tell the user.\n"
         "If the user is just saying hello, respond naturally.\n"
-        "If inputs are missing, politely ask the user to provide them."
+        "If inputs are missing, politely ask the user to provide them. "
+        "Never invent measurements, confidence, or sensor properties. Preserve all limitations and tool errors. "
+        "RGB difference is not a semantic change map. Optical and radar brightness are not directly comparable."
     )
     
     user_prompt = (

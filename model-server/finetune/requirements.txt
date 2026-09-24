@@ -1,0 +1,6 @@
+# Install in an isolated Colab/Kaggle GPU runtime, not in the inference service.
+transformers==4.57.3
+peft==0.18.0
+accelerate>=1.10,<2
+bitsandbytes>=0.46,<1
+Pillow>=10.4

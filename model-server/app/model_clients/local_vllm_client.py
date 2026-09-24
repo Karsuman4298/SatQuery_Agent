@@ -31,7 +31,7 @@ class LocalVLLMClient:
             "include_reasoning": False,
         }
         if json_schema:
-            payload["guided_json"] = json_schema
+            payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "analysis", "schema": json_schema}}
         async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.post(
                 f"{self.base_url}/v1/chat/completions",

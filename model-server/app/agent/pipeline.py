@@ -77,11 +77,20 @@ async def validate_input(state: GraphState) -> GraphState:
 
     # 1. Query-driven task classification
     if query:
-        classifier = await get_classifier()
-        predicted_task, confidence, scores = await classifier.classify(query)
-        state.classifier_scores = scores
-        state.classifier_confidence = confidence
-        state.inferred_task = predicted_task or frontend_mode or "vqa"
+        try:
+            import asyncio
+            async def classify():
+                classifier = await get_classifier()
+                return await classifier.classify(query)
+            predicted_task, confidence, scores = await asyncio.wait_for(classify(), timeout=3)
+            state.classifier_scores = scores
+            state.classifier_confidence = confidence
+            state.inferred_task = predicted_task or frontend_mode or "vqa"
+        except Exception:
+            # Embeddings are optional; the typed router still receives the real query.
+            state.inferred_task = frontend_mode or "vqa"
+            state.classifier_confidence = 0.0
+            state.errors.append({"node": "input_validation", "error": "Embedding classifier unavailable; using configured workflow and constrained router.", "recovered": True})
     else:
         state.inferred_task = frontend_mode or "conversational"
         state.task_routing_reason = "No text query provided"
